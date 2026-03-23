@@ -1,0 +1,164 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 38 30% 97%;
+    --foreground: 20 25% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 20 25% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 25% 12%;
+
+    --primary: 18 76% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 150 18% 92%;
+    --secondary-foreground: 150 28% 28%;
+
+    --muted: 32 18% 93%;
+    --muted-foreground: 20 10% 46%;
+
+    --accent: 152 32% 38%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 32 18% 88%;
+    --input: 32 18% 88%;
+    --ring: 18 76% 48%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 20 20% 8%;
+    --sidebar-foreground: 38 20% 90%;
+    --sidebar-primary: 18 76% 52%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 20 15% 15%;
+    --sidebar-accent-foreground: 38 20% 90%;
+    --sidebar-border: 20 12% 18%;
+    --sidebar-ring: 18 76% 48%;
+
+    /* Status colors */
+    --status-pending: 38 92% 50%;
+    --status-preparing: 210 70% 50%;
+    --status-ready: 152 60% 42%;
+    --status-delivered: 20 10% 60%;
+
+    /* Kitchen specific */
+    --kitchen-bg: 220 14% 10%;
+    --kitchen-card: 220 12% 15%;
+    --kitchen-border: 220 10% 22%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: 'DM Serif Display', serif;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Animations */
+@keyframes fade-in {
+  from { opacity: 0; filter: blur(4px); }
+  to { opacity: 1; filter: blur(0); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes check-draw {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes progress-bar {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+.animate-fade-in { animation: fade-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-slide-up { animation: slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-slide-in-right { animation: slide-in-right 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-scale-in { animation: scale-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-pulse-soft { animation: pulse-soft 2s ease-in-out infinite; }
+
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+
+/* Mobile client shell */
+.client-shell {
+  @apply mx-auto max-w-md min-h-screen bg-background;
+}
+
+/* Kitchen dark theme override */
+.kitchen-theme {
+  --background: 220 14% 10%;
+  --foreground: 210 20% 92%;
+  --card: 220 12% 15%;
+  --card-foreground: 210 20% 92%;
+  --border: 220 10% 22%;
+  --muted: 220 10% 18%;
+  --muted-foreground: 210 12% 60%;
+}
+
+/* Scrollbar styling */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 999px;
+}
