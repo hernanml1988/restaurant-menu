@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock, AlertTriangle, ChefHat, Eye, Filter } from 'lucide-react';
+import { ArrowLeft, Clock, AlertTriangle, ChefHat, Eye, Filter, LogOut, ShieldCheck } from 'lucide-react';
 import { orders, type Order } from '@/data/mockData';
+import { useAuth } from '@/context/AuthContext';
 
 const columns = [
   { id: 'received' as const, label: 'Pendiente', color: 'bg-status-pending', dotColor: 'bg-status-pending' },
@@ -13,6 +14,7 @@ const stations = ['Todas', 'Cocina', 'Bar', 'Postres'];
 
 export default function KitchenDashboard() {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [ordersList, setOrdersList] = useState<Order[]>(orders);
   const [activeStation, setActiveStation] = useState('Todas');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -57,21 +59,47 @@ export default function KitchenDashboard() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-muted-foreground" />
-          {stations.map(s => (
-            <button
-              key={s}
-              onClick={() => setActiveStation(s)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                activeStation === s
-                  ? 'bg-status-pending/20 text-status-pending'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
+        <div className="flex flex-col items-end gap-3">
+          {user ? (
+            <div className="flex items-center gap-3 rounded-2xl border border-border/80 bg-card/60 px-4 py-2.5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-pending/15 text-status-pending">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-medium">{user.fullName}</p>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Cocina
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  logout();
+                  navigate('/login', { replace: true });
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Cerrar sesion"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          ) : null}
+
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            {stations.map(s => (
+              <button
+                key={s}
+                onClick={() => setActiveStation(s)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  activeStation === s
+                    ? 'bg-status-pending/20 text-status-pending'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
