@@ -1,11 +1,10 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChefHat, ShieldCheck } from 'lucide-react';
 import logo from '@/assets/restaurant-logo.png';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
-import { getInternalDemoCredentials } from '@/data/internalAuth';
 import { useRestaurantProfile } from '@/hooks/use-restaurant-profile';
 
 interface LocationState {
@@ -27,9 +26,9 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fromPath = (location.state as LocationState | null)?.from?.pathname;
-  const demoCredentials = useMemo(() => getInternalDemoCredentials(), []);
 
   const redirectAfterLogin = (role: 'admin' | 'kitchen') => {
     if (fromPath) {
@@ -51,18 +50,21 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, user, fromPath, navigate]);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage('');
+    setIsSubmitting(true);
 
-    const result = login({ email, password });
+    const result = await login({ email, password });
 
     if (!result.ok) {
       setErrorMessage(result.message);
+      setIsSubmitting(false);
       return;
     }
 
     redirectAfterLogin(result.role);
+    setIsSubmitting(false);
   };
 
   return (
@@ -125,7 +127,7 @@ export default function LoginPage() {
               <h2 className="font-display text-3xl">Acceso a modulos internos</h2>
             </div>
             <div className="rounded-2xl bg-secondary px-3 py-2 text-xs font-medium text-secondary-foreground">
-              Demo local
+              Backend real
             </div>
           </div>
 
@@ -139,7 +141,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="admin@mesamagica.local"
+                placeholder="usuario@empresa.com"
                 className="h-12 rounded-xl border-border/80 bg-background/80"
                 autoComplete="username"
               />
@@ -166,35 +168,24 @@ export default function LoginPage() {
               </div>
             ) : null}
 
-            <Button type="submit" size="lg" className="h-12 w-full rounded-xl text-sm">
-              Ingresar
+            <Button
+              type="submit"
+              size="lg"
+              className="h-12 w-full rounded-xl text-sm"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Ingresando...' : 'Ingresar'}
             </Button>
           </form>
 
           <div className="mt-8 rounded-[1.5rem] bg-muted/70 p-5">
-            <p className="text-sm font-semibold text-foreground">Credenciales de prueba</p>
-            <div className="mt-4 space-y-3">
-              {demoCredentials.map((credential) => (
-                <button
-                  key={credential.email}
-                  type="button"
-                  onClick={() => {
-                    setEmail(credential.email);
-                    setPassword(credential.password);
-                    setErrorMessage('');
-                  }}
-                  className="w-full rounded-2xl border border-border/70 bg-card px-4 py-3 text-left transition-colors hover:border-primary/40"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium text-foreground">{roleLabels[credential.role]}</span>
-                    <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                      {credential.role}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">{credential.email}</p>
-                  <p className="text-sm text-muted-foreground">{credential.password}</p>
-                </button>
-              ))}
+            <p className="text-sm font-semibold text-foreground">Acceso conectado al backend</p>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Este formulario ahora usa `POST /auth/login` y mantiene la sesion con cookies HTTP-only.
+              Inicia con una cuenta registrada en la API y te redirigimos segun el rol recibido.
+            </p>
+            <div className="mt-4 rounded-2xl border border-border/70 bg-card px-4 py-3 text-sm text-muted-foreground">
+              Roles compatibles: {roleLabels.admin} y {roleLabels.kitchen}.
             </div>
           </div>
         </section>

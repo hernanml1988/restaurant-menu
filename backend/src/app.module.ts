@@ -13,6 +13,18 @@ import { Profile } from './profile/entities/profile.entity';
 import { ProfileRoleModule } from './profile_role/profile_role.module';
 import { ProfileRole } from './profile_role/entities/profile_role.entity';
 import { AuthModule } from './auth/auth.module';
+import { Restaurant } from './restaurant/entities/restaurant.entity';
+import { Table } from './table/entities/table.entity';
+import { Category } from './category/entities/category.entity';
+import { Product } from './product/entities/product.entity';
+import { ProductExtra } from './product_extra/entities/product_extra.entity';
+import { DiningSession } from './dining_session/entities/dining_session.entity';
+import { Order } from './order/entities/order.entity';
+import { OrderItem } from './order/entities/order_item.entity';
+import { OrderItemExtraSelection } from './order/entities/order_item_extra_selection.entity';
+import { ServiceRequest } from './service_request/entities/service_request.entity';
+import { RestaurantModule } from './restaurant/restaurant.module';
+import { TableModule } from './table/table.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
@@ -30,7 +42,17 @@ import { AuthModule } from './auth/auth.module';
           User,
           Role,
           Profile,
-          ProfileRole
+          ProfileRole,
+          Restaurant,
+          Table,
+          Category,
+          Product,
+          ProductExtra,
+          DiningSession,
+          Order,
+          OrderItem,
+          OrderItemExtraSelection,
+          ServiceRequest,
         ],
         synchronize: true,
       }),
@@ -40,6 +62,8 @@ import { AuthModule } from './auth/auth.module';
     ProfileModule,
     ProfileRoleModule,
     AuthModule,
+    RestaurantModule,
+    TableModule,
   ],
   controllers: [AppController],
   providers: [AppService],

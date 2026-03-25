@@ -20,11 +20,10 @@ services:
       retries: 5
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: node:20-alpine
     container_name: restaurant-menu-backend
     restart: unless-stopped
+    working_dir: /app
     depends_on:
       db:
         condition: service_healthy
@@ -35,19 +34,34 @@ services:
       DATABASE_USERNAME: postgres
       DATABASE_PASSWORD: 123456789
       DATABASE_NAME: calendar
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    command: sh -c "npm install && npm run start:dev -- --poll"
     ports:
       - "3015:3015"
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
 
   frontend:
-    build:
-      context: ./mesa-magica
-      dockerfile: Dockerfile
+    image: node:20-alpine
     container_name: restaurant-menu-frontend
     restart: unless-stopped
+    working_dir: /app
     depends_on:
       - backend
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      VITE_API_URL: http://localhost:3015
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 8080"
     ports:
-      - "8080:80"
+      - "8080:8080"
+    volumes:
+      - ./mesa-magica:/app
+      - frontend_node_modules:/app/node_modules
 
 volumes:
   postgres_data:
+  backend_node_modules:
+  frontend_node_modules:

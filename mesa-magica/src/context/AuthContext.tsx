@@ -1,42 +1,58 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { clearInternalSession, readInternalSession, saveInternalSession } from '@/data/internalAuth';
 import {
-  authenticateInternalUser,
-  clearInternalSession,
-  InternalModuleRole,
-  readInternalSession,
-  saveInternalSession,
-} from '@/data/internalAuth';
+  type AuthenticatedUser,
+  type InternalModuleRole,
+  loginRequest,
+  logoutRequest,
+  validateSessionRequest,
+} from '@/services/authService';
 
 interface LoginPayload {
   email: string;
   password: string;
 }
 
-interface AuthUser {
-  id: string;
-  email: string;
-  fullName: string;
-  role: InternalModuleRole;
-}
-
 interface AuthContextValue {
   isAuthenticated: boolean;
   isReady: boolean;
-  user: AuthUser | null;
-  login: (payload: LoginPayload) => { ok: true; role: InternalModuleRole } | { ok: false; message: string };
-  logout: () => void;
+  user: AuthenticatedUser | null;
+  login: (
+    payload: LoginPayload,
+  ) => Promise<{ ok: true; role: InternalModuleRole } | { ok: false; message: string }>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const storedSession = readInternalSession();
-    setUser(storedSession?.user ?? null);
-    setIsReady(true);
+    const syncSession = async () => {
+      const storedSession = readInternalSession();
+
+      if (!storedSession?.user) {
+        setUser(null);
+        setIsReady(true);
+        return;
+      }
+
+      const isValidSession = await validateSessionRequest().catch(() => false);
+
+      if (!isValidSession) {
+        clearInternalSession();
+        setUser(null);
+        setIsReady(true);
+        return;
+      }
+
+      setUser(storedSession.user);
+      setIsReady(true);
+    };
+
+    void syncSession();
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -44,25 +60,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: !!user,
       isReady,
       user,
-      login: ({ email, password }) => {
-        const authenticatedUser = authenticateInternalUser(email, password);
+      login: async ({ email, password }) => {
+        const result = await loginRequest({ email, password });
 
-        if (!authenticatedUser) {
+        if (!result.ok) {
           return {
             ok: false as const,
-            message: 'Credenciales invalidas. Revisa el correo y la contrasena.',
+            message: result.message,
           };
         }
 
-        saveInternalSession({ user: authenticatedUser });
-        setUser(authenticatedUser);
+        saveInternalSession({ user: result.user });
+        setUser(result.user);
 
         return {
           ok: true as const,
-          role: authenticatedUser.role,
+          role: result.user.role,
         };
       },
-      logout: () => {
+      logout: async () => {
+        await logoutRequest().catch(() => undefined);
         clearInternalSession();
         setUser(null);
       },
