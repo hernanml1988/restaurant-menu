@@ -33,9 +33,21 @@ export class UserService {
       return null;
     }
 
+    const currentProfileRole = user.profile?.profileRoles?.[0] ?? null;
+    const fullName = [
+      user.profile?.name,
+      user.profile?.lastname,
+      user.profile?.secondLastname,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+
     return {
       id: user.id,
       username: user.username,
+      email: user.username,
+      fullName,
       state: user.state,
       status: user.status,
       createdAt: user.createdAt,
@@ -46,6 +58,12 @@ export class UserService {
             name: user.profile.name,
             lastname: user.profile.lastname,
             secondLastname: user.profile.secondLastname,
+          }
+        : null,
+      role: currentProfileRole?.role
+        ? {
+            id: currentProfileRole.role.id,
+            name: currentProfileRole.role.name,
           }
         : null,
       roles:
