@@ -28,8 +28,9 @@ export class CreateUserDto {
   @IsString()
   secondLastname?: string;
 
+  @IsOptional()
   @IsUUID()
-  roleId: string;
+  roleId?: string;
 
   @IsOptional()
   @IsBoolean()

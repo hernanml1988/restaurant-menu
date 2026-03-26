@@ -139,7 +139,9 @@ export class UserService {
         throw new ConflictException('Username already exists');
       }
 
-      const role = await this.findRoleOrFail(createUserDto.roleId);
+      const role = createUserDto.roleId
+        ? await this.findRoleOrFail(createUserDto.roleId)
+        : null;
 
       const user = new User();
       user.username = createUserDto.username;
@@ -156,11 +158,13 @@ export class UserService {
 
       const newProfile = await this.profileRepository.save(profile);
 
-      const profileRole = new ProfileRole();
-      profileRole.profile = newProfile;
-      profileRole.role = role;
+      if (role) {
+        const profileRole = new ProfileRole();
+        profileRole.profile = newProfile;
+        profileRole.role = role;
 
-      await this.profileRoleRepository.save(profileRole);
+        await this.profileRoleRepository.save(profileRole);
+      }
 
       const createdUser = await this.userRepository.findOne({
         where: { id: newUser.id },

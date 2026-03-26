@@ -13,7 +13,7 @@
   Frontend: Medio. La separacion por vistas es clara, pero el estado y los datos siguen centralizados y locales.
   Backend: Medio. La estructura modular existe, pero varios modulos CRUD estan en estado scaffold y no completan su capa de negocio.
 - Integracion entre frontend y backend: No determinada como implementacion activa. El frontend actual consume datos mock locales y no realiza llamadas HTTP al backend.
-- Infraestructura detectada: `docker-compose.yml` define `db` PostgreSQL, `backend` y `frontend`. La referencia a `backend/Dockerfile` existe en compose, pero su archivo no fue identificado en el repositorio analizado.
+- Infraestructura detectada: no hay dockerizacion activa en el repositorio. El desarrollo local se resuelve con ejecucion directa de `backend` y `mesa-magica` mediante Node.js, y la base PostgreSQL debe estar disponible fuera del repo o instalada localmente.
 
 ## 2. Lineamientos Frontend
 - Framework: React 18 + TypeScript + Vite.
@@ -204,4 +204,5 @@
 - Patron de documentacion backend registrado: los ejemplos manuales de consumo HTTP deben guardarse en archivos bajo `backend/docs/curl/`, organizados por controlador o recurso, con nombres consistentes como `<recurso>.curl.md` y ejemplos reales de cookies, payloads y rutas disponibles.
 - Regla de controllers backend registrada: todo controller nuevo debe crearse protegido por validacion de cookies basada en la cookie `jwt` desde su definicion inicial.
 - Excepcion tecnica registrada: solo los endpoints explicitamente publicos y necesarios para bootstrap o autenticacion inicial, como `auth/login`, `auth/refresh`, `auth/logout` o cargas iniciales deliberadas, pueden quedar sin guard de cookies, y esa excepcion debe quedar justificada de forma explicita.
-- Patron de infraestructura local registrado: para desarrollo con Docker, `backend` y `frontend` deben ejecutarse en modo watch con codigo montado por volumen, `node_modules` persistido en volumen dedicado y variables de polling cuando el host lo requiera, evitando depender de rebuild manual tras cada guardado.
+- Patron de infraestructura local registrado: el entorno de desarrollo vigente no debe depender de Docker. `backend` y `mesa-magica` deben ejecutarse localmente con sus scripts `npm`, manteniendo la configuracion sensible en archivos `.env` y dejando PostgreSQL como dependencia externa al repositorio.
+- Patron de infraestructura complementaria registrado: si se agrega Docker, debe implementarse como via opcional y no como reemplazo obligatorio del flujo local con `npm`; la orquestacion debe vivir en la raiz del monorepo, preservar la separacion `backend` y `mesa-magica`, y resolver dependencias locales de desarrollo mediante volumenes y servicios dedicados sin alterar los `.env` usados fuera de contenedores.

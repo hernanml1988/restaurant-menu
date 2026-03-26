@@ -26,21 +26,14 @@ ENV WATCHPACK_POLLING=true
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-EXPOSE 3015
+EXPOSE 8080
 
-CMD ["npm", "run", "start:dev"]
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "8080"]
 
-FROM node:20-alpine AS production
+FROM nginx:1.27-alpine AS production
 
-WORKDIR /app
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-ENV NODE_ENV=production
+EXPOSE 80
 
-COPY package*.json ./
-RUN npm ci --omit=dev
-
-COPY --from=builder /app/dist ./dist
-
-EXPOSE 3015
-
-CMD ["npm", "run", "start:prod"]
+CMD ["nginx", "-g", "daemon off;"]
