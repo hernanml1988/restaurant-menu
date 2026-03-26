@@ -1,4 +1,5 @@
 import { ChangeEvent, useEffect, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Building2,
   ImagePlus,
@@ -8,11 +9,16 @@ import {
   RotateCcw,
   Save,
 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { toast } from '@/components/ui/use-toast';
 import { useRestaurantProfile } from '@/hooks/use-restaurant-profile';
 import {
-  defaultRestaurantProfile,
   RestaurantProfile,
 } from '@/data/restaurantProfile';
+import {
+  resetCurrentRestaurantProfileRequest,
+  updateCurrentRestaurantProfileRequest,
+} from '@/services/restaurantService';
 
 function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -34,13 +40,65 @@ function readFileAsDataUrl(file: File) {
 }
 
 export default function AdminMyData() {
-  const { profile, updateProfile, resetProfile } = useRestaurantProfile();
+  const { profile, isLoading, isError, error } = useRestaurantProfile();
   const [form, setForm] = useState<RestaurantProfile>(profile);
   const [savedMessage, setSavedMessage] = useState('');
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     setForm(profile);
   }, [profile]);
+
+  const updateProfileMutation = useMutation({
+    mutationFn: updateCurrentRestaurantProfileRequest,
+    onSuccess: () => {
+      setSavedMessage('Cambios guardados correctamente.');
+      toast({
+        title: 'Datos actualizados',
+        description: 'La informacion del restaurante se guardó en el backend.',
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['restaurant', 'profile'],
+      });
+    },
+    onError: (mutationError) => {
+      setSavedMessage('');
+      toast({
+        title: 'No se pudieron guardar los cambios',
+        description:
+          mutationError instanceof Error
+            ? mutationError.message
+            : 'Verifica la sesion activa y vuelve a intentarlo.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const resetProfileMutation = useMutation({
+    mutationFn: resetCurrentRestaurantProfileRequest,
+    onSuccess: (nextProfile) => {
+      setForm(nextProfile);
+      setSavedMessage('Se restauraron los datos por defecto.');
+      toast({
+        title: 'Datos restaurados',
+        description: 'La configuracion base del restaurante quedó restaurada.',
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['restaurant', 'profile'],
+      });
+    },
+    onError: (mutationError) => {
+      setSavedMessage('');
+      toast({
+        title: 'No se pudieron restaurar los datos',
+        description:
+          mutationError instanceof Error
+            ? mutationError.message
+            : 'Verifica la sesion activa y vuelve a intentarlo.',
+        variant: 'destructive',
+      });
+    },
+  });
 
   const handleChange =
     (field: keyof RestaurantProfile) =>
@@ -69,14 +127,11 @@ export default function AdminMyData() {
   };
 
   const handleSave = () => {
-    updateProfile(form);
-    setSavedMessage('Cambios guardados correctamente.');
+    updateProfileMutation.mutate(form);
   };
 
   const handleReset = () => {
-    resetProfile();
-    setForm(defaultRestaurantProfile);
-    setSavedMessage('Se restauraron los datos por defecto.');
+    resetProfileMutation.mutate();
   };
 
   const handleRemoveLogo = () => {
@@ -99,20 +154,33 @@ export default function AdminMyData() {
         <div className="flex gap-2">
           <button
             onClick={handleReset}
+            disabled={resetProfileMutation.isPending}
             className="px-4 py-2.5 rounded-xl border text-sm font-medium flex items-center gap-2 hover:bg-muted active:scale-[0.97]"
           >
             <RotateCcw className="w-4 h-4" />
-            Restaurar
+            {resetProfileMutation.isPending ? 'Restaurando...' : 'Restaurar'}
           </button>
           <button
             onClick={handleSave}
+            disabled={updateProfileMutation.isPending || isLoading}
             className="bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 shadow-lg shadow-primary/20 active:scale-[0.97]"
           >
             <Save className="w-4 h-4" />
-            Guardar cambios
+            {updateProfileMutation.isPending ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </div>
       </div>
+
+      {isError && (
+        <Alert className="mb-6 border-destructive/30 bg-destructive/5">
+          <AlertTitle>No se pudieron cargar los datos del restaurante</AlertTitle>
+          <AlertDescription>
+            {error instanceof Error
+              ? error.message
+              : 'Verifica la conexion con el backend.'}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {savedMessage && (
         <div className="mb-6 rounded-2xl border border-accent/20 bg-accent/10 px-4 py-3 text-sm text-accent">
@@ -133,6 +201,7 @@ export default function AdminMyData() {
               <input
                 value={form.name}
                 onChange={handleChange('name')}
+                disabled={isLoading}
                 className="w-full rounded-xl bg-muted border-0 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 placeholder="Nombre comercial"
               />
@@ -143,6 +212,7 @@ export default function AdminMyData() {
               <input
                 value={form.tagline}
                 onChange={handleChange('tagline')}
+                disabled={isLoading}
                 className="w-full rounded-xl bg-muted border-0 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 placeholder="Frase principal"
               />
@@ -156,6 +226,7 @@ export default function AdminMyData() {
               <input
                 value={form.phone}
                 onChange={handleChange('phone')}
+                disabled={isLoading}
                 className="w-full rounded-xl bg-muted border-0 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 placeholder="+56 ..."
               />
@@ -169,6 +240,7 @@ export default function AdminMyData() {
               <input
                 value={form.email}
                 onChange={handleChange('email')}
+                disabled={isLoading}
                 className="w-full rounded-xl bg-muted border-0 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 placeholder="correo@restaurante.com"
               />
@@ -183,6 +255,7 @@ export default function AdminMyData() {
             <input
               value={form.address}
               onChange={handleChange('address')}
+              disabled={isLoading}
               className="w-full rounded-xl bg-muted border-0 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               placeholder="Direccion del local"
             />
@@ -193,6 +266,7 @@ export default function AdminMyData() {
             <textarea
               value={form.description}
               onChange={handleChange('description')}
+              disabled={isLoading}
               rows={5}
               className="w-full rounded-2xl bg-muted border-0 px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
               placeholder="Describe la propuesta del restaurante"
@@ -232,11 +306,13 @@ export default function AdminMyData() {
                   type="file"
                   accept="image/*"
                   onChange={handleLogoChange}
+                  disabled={isLoading}
                   className="hidden"
                 />
               </label>
               <button
                 onClick={handleRemoveLogo}
+                disabled={isLoading}
                 className="px-4 py-2.5 rounded-xl border text-sm font-medium hover:bg-muted active:scale-[0.97]"
               >
                 Quitar logo

@@ -7,6 +7,9 @@ export default () => ({
       password: process.env.DATABASE_PASSWORD,
       database: process.env.DATABASE_NAME,
     },
+    frontend: {
+      publicUrl: process.env.FRONTEND_PUBLIC_URL,
+    },
     sendgridApiKey: process.env.SENDGRID_API_KEY,
   });
   

@@ -1,30 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   defaultRestaurantProfile,
-  readRestaurantProfile,
-  RestaurantProfile,
-  saveRestaurantProfile,
 } from '@/data/restaurantProfile';
+import { getCurrentRestaurantProfileRequest } from '@/services/restaurantService';
 
 export function useRestaurantProfile() {
-  const [profile, setProfile] = useState<RestaurantProfile>(defaultRestaurantProfile);
-
-  useEffect(() => {
-    setProfile(readRestaurantProfile());
-  }, []);
-
-  const updateProfile = (nextProfile: RestaurantProfile) => {
-    saveRestaurantProfile(nextProfile);
-    setProfile(nextProfile);
-  };
-
-  const resetProfile = () => {
-    updateProfile(defaultRestaurantProfile);
-  };
+  const query = useQuery({
+    queryKey: ['restaurant', 'profile'],
+    queryFn: getCurrentRestaurantProfileRequest,
+  });
 
   return {
-    profile,
-    updateProfile,
-    resetProfile,
+    profile: query.data ?? defaultRestaurantProfile,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
   };
 }

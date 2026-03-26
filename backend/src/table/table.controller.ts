@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -27,6 +28,11 @@ export class TableController {
   @UseGuards(AuthGuard('jwt'))
   findAll() {
     return this.tableService.findAll();
+  }
+
+  @Get('public/qr')
+  findByQrCode(@Query('value') qrCode: string) {
+    return this.tableService.findByQrCode(qrCode);
   }
 
   @Get(':id')

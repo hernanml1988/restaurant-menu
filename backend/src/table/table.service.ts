@@ -1,10 +1,13 @@
 import {
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { randomUUID } from 'crypto';
 import { Restaurant } from '../restaurant/entities/restaurant.entity';
 import { CreateTableDto } from './dto/create-table.dto';
 import { UpdateTableDto } from './dto/update-table.dto';
@@ -18,7 +21,35 @@ export class TableService {
     private readonly tableRepository: Repository<Table>,
     @InjectRepository(Restaurant)
     private readonly restaurantRepository: Repository<Restaurant>,
+    private readonly configService: ConfigService,
   ) {}
+
+  private generateQrCodePayload(
+    restaurantId: string,
+    tableNumber: number,
+    tableName: string,
+  ) {
+    const frontendPublicUrl = this.configService.get<string>(
+      'frontend.publicUrl',
+    );
+
+    if (!frontendPublicUrl) {
+      throw new InternalServerErrorException(
+        'FRONTEND_PUBLIC_URL is not configured',
+      );
+    }
+
+    const slugName = tableName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    const tableToken = `table:${restaurantId}:${tableNumber}:${slugName || 'mesa'}:${randomUUID()}`;
+    const normalizedFrontendPublicUrl = frontendPublicUrl.replace(/\/+$/, '');
+
+    return `${normalizedFrontendPublicUrl}/cliente/bienvenida?qr=${encodeURIComponent(tableToken)}`;
+  }
 
   async create(createTableDto: CreateTableDto) {
     try {
@@ -30,8 +61,16 @@ export class TableService {
         throw new NotFoundException('Restaurant not found');
       }
 
+      const qrCode =
+        createTableDto.qrCode ??
+        this.generateQrCodePayload(
+          restaurant.id,
+          createTableDto.number,
+          createTableDto.name,
+        );
+
       const existingTable = await this.tableRepository.findOne({
-        where: { qrCode: createTableDto.qrCode },
+        where: { qrCode },
       });
 
       if (existingTable) {
@@ -43,7 +82,7 @@ export class TableService {
         name: createTableDto.name,
         capacity: createTableDto.capacity,
         zone: createTableDto.zone,
-        qrCode: createTableDto.qrCode,
+        qrCode,
         serviceStatus: createTableDto.serviceStatus,
         activeOrders: createTableDto.activeOrders ?? 0,
         state: createTableDto.state ?? true,
@@ -55,6 +94,31 @@ export class TableService {
       return {
         message: 'Mesa creada exitosamente',
         data: newTable,
+      };
+    } catch (error) {
+      Utils.errorResponse(error);
+    }
+  }
+
+  async findByQrCode(qrCode: string) {
+    try {
+      const table = await this.tableRepository.findOne({
+        where: {
+          qrCode,
+          state: true,
+        },
+        relations: {
+          restaurant: true,
+        },
+      });
+
+      if (!table) {
+        throw new NotFoundException('Table not found');
+      }
+
+      return {
+        message: 'Mesa obtenida exitosamente por QR',
+        data: table,
       };
     } catch (error) {
       Utils.errorResponse(error);

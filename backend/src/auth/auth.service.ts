@@ -89,7 +89,7 @@ export class AuthService {
 
     const authUser = this.buildAuthUser(user);
     
-    sif (!authUser.role) {
+    if (!authUser.role) {
       return res.status(403).send({
         message: 'El usuario no tiene un rol interno compatible.',
       });

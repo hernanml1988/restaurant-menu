@@ -25,6 +25,8 @@ import { OrderItemExtraSelection } from './order/entities/order_item_extra_selec
 import { ServiceRequest } from './service_request/entities/service_request.entity';
 import { RestaurantModule } from './restaurant/restaurant.module';
 import { TableModule } from './table/table.module';
+import { DiningSessionModule } from './dining_session/dining_session.module';
+import { OrderModule } from './order/order.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
@@ -64,6 +66,8 @@ import { TableModule } from './table/table.module';
     AuthModule,
     RestaurantModule,
     TableModule,
+    DiningSessionModule,
+    OrderModule,
   ],
   controllers: [AppController],
   providers: [AppService],

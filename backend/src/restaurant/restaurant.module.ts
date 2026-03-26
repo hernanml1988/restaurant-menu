@@ -9,7 +9,9 @@ import { ProductExtra } from '../product_extra/entities/product_extra.entity';
 import { Product } from '../product/entities/product.entity';
 import { ServiceRequest } from '../service_request/entities/service_request.entity';
 import { Table } from '../table/entities/table.entity';
+import { RestaurantController } from './restaurant.controller';
 import { Restaurant } from './entities/restaurant.entity';
+import { RestaurantService } from './restaurant.service';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { Restaurant } from './entities/restaurant.entity';
       ServiceRequest,
     ]),
   ],
-  exports: [TypeOrmModule],
+  controllers: [RestaurantController],
+  providers: [RestaurantService],
+  exports: [RestaurantService, TypeOrmModule],
 })
 export class RestaurantModule {}

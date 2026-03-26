@@ -31,9 +31,10 @@ export class CreateTableDto {
   @IsNotEmpty()
   zone: string;
 
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  qrCode: string;
+  qrCode?: string;
 
   @IsOptional()
   @IsEnum(TableStatusEnum)
