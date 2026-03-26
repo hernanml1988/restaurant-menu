@@ -27,6 +27,8 @@ import { RestaurantModule } from './restaurant/restaurant.module';
 import { TableModule } from './table/table.module';
 import { DiningSessionModule } from './dining_session/dining_session.module';
 import { OrderModule } from './order/order.module';
+import { CategoryModule } from './category/category.module';
+import { ProductModule } from './product/product.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
@@ -66,6 +68,8 @@ import { OrderModule } from './order/order.module';
     AuthModule,
     RestaurantModule,
     TableModule,
+    CategoryModule,
+    ProductModule,
     DiningSessionModule,
     OrderModule,
   ],
