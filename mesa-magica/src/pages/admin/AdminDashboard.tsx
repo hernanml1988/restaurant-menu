@@ -1,57 +1,155 @@
-import { TrendingUp, Users, Clock, DollarSign, ArrowUpRight } from 'lucide-react';
-import { dailyStats, topProducts } from '@/data/mockData';
+import { useQuery } from '@tanstack/react-query';
+import {
+  ArrowUpRight,
+  Clock,
+  DollarSign,
+  TrendingUp,
+  Users,
+} from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { getDashboardSummaryRequest } from '@/services/dashboardService';
 
-const kpis = [
-  { label: 'Mesas ocupadas', value: `${dailyStats.occupiedTables}/${dailyStats.totalTables}`, icon: Users, change: '+2 vs ayer', color: 'bg-primary/10 text-primary' },
-  { label: 'Pedidos activos', value: dailyStats.activeOrders, icon: TrendingUp, change: '34 completados', color: 'bg-accent/10 text-accent' },
-  { label: 'Ventas del día', value: `S/ ${dailyStats.totalSalesToday.toLocaleString()}`, icon: DollarSign, change: '+12% vs promedio', color: 'bg-status-pending/10 text-status-pending' },
-  { label: 'Tiempo promedio', value: `${dailyStats.avgPrepTime} min`, icon: Clock, change: '-3 min vs ayer', color: 'bg-status-preparing/10 text-status-preparing' },
-];
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    maximumFractionDigits: 0,
+  }).format(value);
+}
 
 export default function AdminDashboard() {
+  const dashboardQuery = useQuery({
+    queryKey: ['admin', 'dashboard', 'summary'],
+    queryFn: getDashboardSummaryRequest,
+  });
+
+  const dashboard = dashboardQuery.data;
+  const topProducts = dashboard?.topProducts ?? [];
+  const topReference = topProducts[0]?.orders ?? 1;
+
+  const kpis = [
+    {
+      label: 'Mesas ocupadas',
+      value: `${dashboard?.occupiedTables ?? 0}/${dashboard?.totalTables ?? 0}`,
+      icon: Users,
+      change: `${dashboard?.totalTables ?? 0} mesas configuradas`,
+      color: 'bg-primary/10 text-primary',
+    },
+    {
+      label: 'Pedidos activos',
+      value: String(dashboard?.activeOrders ?? 0),
+      icon: TrendingUp,
+      change: `${dashboard?.completedOrders ?? 0} completados hoy`,
+      color: 'bg-accent/10 text-accent',
+    },
+    {
+      label: 'Ventas del dia',
+      value: formatCurrency(dashboard?.totalSalesToday ?? 0),
+      icon: DollarSign,
+      change: `${topProducts.length} productos destacados`,
+      color: 'bg-status-pending/10 text-status-pending',
+    },
+    {
+      label: 'Tiempo promedio',
+      value: `${dashboard?.avgPrepTime ?? 0} min`,
+      icon: Clock,
+      change: 'Promedio del rango actual',
+      color: 'bg-status-preparing/10 text-status-preparing',
+    },
+  ];
+
   return (
     <div className="animate-fade-in">
       <div className="mb-8">
-        <h1 className="font-display text-3xl mb-1">Dashboard</h1>
-        <p className="text-muted-foreground">Resumen general del día — Domingo, 22 de marzo 2026</p>
+        <h1 className="mb-1 font-display text-3xl">Dashboard</h1>
+        <p className="text-muted-foreground">
+          Resumen general del dia
+          {dashboard?.dateLabel ? ` - ${dashboard.dateLabel}` : ''}
+        </p>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {kpis.map((kpi, i) => (
-          <div key={kpi.label} className="bg-card border rounded-2xl p-5 animate-slide-up" style={{ animationDelay: `${i * 80}ms` }}>
-            <div className="flex items-center justify-between mb-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${kpi.color}`}>
-                <kpi.icon className="w-5 h-5" />
+      {dashboardQuery.error && (
+        <Alert className="mb-6 border-destructive/30 bg-destructive/5">
+          <AlertTitle>No se pudo cargar el dashboard</AlertTitle>
+          <AlertDescription>
+            {dashboardQuery.error instanceof Error
+              ? dashboardQuery.error.message
+              : 'Verifica la sesion activa y la conexion con el backend.'}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {kpis.map((kpi, index) => (
+          <div
+            key={kpi.label}
+            className="animate-slide-up rounded-2xl border bg-card p-5"
+            style={{ animationDelay: `${index * 80}ms` }}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <div
+                className={`flex h-10 w-10 items-center justify-center rounded-xl ${kpi.color}`}
+              >
+                <kpi.icon className="h-5 w-5" />
               </div>
-              <span className="text-xs text-accent flex items-center gap-0.5">
-                <ArrowUpRight className="w-3 h-3" />
+              <span className="flex items-center gap-0.5 text-xs text-accent">
+                <ArrowUpRight className="h-3 w-3" />
                 {kpi.change}
               </span>
             </div>
-            <p className="font-display text-2xl mb-0.5">{kpi.value}</p>
+            <p className="mb-0.5 font-display text-2xl">{kpi.value}</p>
             <p className="text-sm text-muted-foreground">{kpi.label}</p>
           </div>
         ))}
       </div>
 
-      {/* Top products */}
-      <div className="bg-card border rounded-2xl p-6 animate-slide-up delay-300">
-        <h2 className="font-semibold text-lg mb-4">Productos más pedidos hoy</h2>
+      <div className="animate-slide-up rounded-2xl border bg-card p-6 delay-300">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold">Productos mas pedidos hoy</h2>
+            <p className="text-sm text-muted-foreground">
+              Ranking operativo del dashboard administrativo.
+            </p>
+          </div>
+          {dashboardQuery.isLoading && (
+            <p className="text-sm text-muted-foreground">Cargando...</p>
+          )}
+        </div>
+
         <div className="space-y-3">
-          {topProducts.map((p, i) => (
-            <div key={p.name} className="flex items-center gap-4">
-              <span className="w-6 text-sm text-muted-foreground font-medium tabular-nums">{i + 1}</span>
+          {topProducts.map((product) => (
+            <div key={product.productId} className="flex items-center gap-4">
+              <span className="w-6 text-sm font-medium tabular-nums text-muted-foreground">
+                {product.rank}
+              </span>
               <div className="flex-1">
-                <p className="font-medium text-sm">{p.name}</p>
-                <p className="text-xs text-muted-foreground">{p.orders} pedidos</p>
+                <p className="text-sm font-medium">{product.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {product.orders} pedidos
+                </p>
               </div>
-              <div className="w-32 bg-muted rounded-full h-2 overflow-hidden">
-                <div className="bg-primary h-full rounded-full" style={{ width: `${(p.orders / topProducts[0].orders) * 100}%` }} />
+              <div className="h-2 w-32 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{
+                    width: `${Math.max(
+                      8,
+                      (product.orders / Math.max(topReference, 1)) * 100,
+                    )}%`,
+                  }}
+                />
               </div>
-              <span className="text-sm font-display text-primary tabular-nums w-20 text-right">S/ {p.revenue.toLocaleString()}</span>
+              <span className="w-24 text-right font-display text-sm tabular-nums text-primary">
+                {formatCurrency(product.revenue)}
+              </span>
             </div>
           ))}
+
+          {!dashboardQuery.isLoading && !topProducts.length && (
+            <p className="text-sm text-muted-foreground">
+              No hay productos pedidos en el rango actual.
+            </p>
+          )}
         </div>
       </div>
     </div>

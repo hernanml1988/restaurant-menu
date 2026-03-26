@@ -9,6 +9,11 @@ import { ReportService } from './report.service';
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}
 
+  @Get('dashboard-summary')
+  getDashboardSummary(@Query() query: TopProductsQueryDto) {
+    return this.reportService.getDashboardSummary(query);
+  }
+
   @Get('sales-by-day')
   getSalesByDay(@Query() query: ReportRangeQueryDto) {
     return this.reportService.getSalesByDay(query);

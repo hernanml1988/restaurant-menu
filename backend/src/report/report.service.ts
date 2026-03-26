@@ -4,11 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, In, MoreThan, Repository } from 'typeorm';
 import { DiningSession } from '../dining_session/entities/dining_session.entity';
 import { Order } from '../order/entities/order.entity';
+import { OrderStatusEnum } from '../order/entities/order.entity';
 import { OrderItem } from '../order/entities/order_item.entity';
 import { Restaurant } from '../restaurant/entities/restaurant.entity';
+import { Table } from '../table/entities/table.entity';
 import Utils from '../utils/errorUtils';
 import { ReportRangeQueryDto } from './dto/report-range-query.dto';
 import { TopProductsQueryDto } from './dto/top-products-query.dto';
@@ -29,6 +31,8 @@ export class ReportService {
     private readonly orderItemRepository: Repository<OrderItem>,
     @InjectRepository(DiningSession)
     private readonly diningSessionRepository: Repository<DiningSession>,
+    @InjectRepository(Table)
+    private readonly tableRepository: Repository<Table>,
   ) {}
 
   private async resolveCurrentRestaurant() {
@@ -88,6 +92,137 @@ export class ReportService {
 
   private getHourLabel(hour: number) {
     return `${String(hour).padStart(2, '0')}:00`;
+  }
+
+  private getDateLabel(date: Date) {
+    return date.toLocaleDateString('es-CL', {
+      weekday: 'long',
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
+  }
+
+  async getDashboardSummary(query: TopProductsQueryDto) {
+    try {
+      const restaurant = await this.resolveCurrentRestaurant();
+      const range = this.resolveRange(query);
+      const topLimit = query.limit ?? 5;
+
+      const [totalTables, occupiedTables, activeOrders, salesSummary, prepRaw, topRows] =
+        await Promise.all([
+          this.tableRepository.count({
+            where: {
+              restaurant: { id: restaurant.id },
+              state: true,
+            },
+          }),
+          this.tableRepository.count({
+            where: {
+              restaurant: { id: restaurant.id },
+              state: true,
+              activeOrders: MoreThan(0),
+            },
+          }),
+          this.orderRepository.count({
+            where: {
+              restaurant: { id: restaurant.id },
+              state: true,
+              orderStatus: In([
+                OrderStatusEnum.RECEIVED,
+                OrderStatusEnum.PREPARING,
+                OrderStatusEnum.READY,
+              ]),
+              createdAt: Between(range.startDate, range.endDate),
+            },
+          }),
+          this.orderRepository
+            .createQueryBuilder('order')
+            .select('COUNT(order.id)', 'totalOrders')
+            .addSelect(
+              `COUNT(CASE WHEN order.orderStatus = :deliveredStatus THEN 1 END)`,
+              'completedOrders',
+            )
+            .addSelect('COALESCE(SUM(order.total), 0)', 'totalSalesToday')
+            .where('order.restaurantId = :restaurantId', {
+              restaurantId: restaurant.id,
+            })
+            .andWhere('order.state = true')
+            .andWhere('order.createdAt BETWEEN :startDate AND :endDate', range)
+            .setParameter('deliveredStatus', OrderStatusEnum.DELIVERED)
+            .getRawOne<{
+              totalOrders: string;
+              completedOrders: string;
+              totalSalesToday: string;
+            }>(),
+          this.orderRepository
+            .createQueryBuilder('order')
+            .select(
+              `AVG(EXTRACT(EPOCH FROM (COALESCE(order.deliveredAt, order.estimatedReadyAt) - order.createdAt)) / 60.0)`,
+              'avg',
+            )
+            .where('order.restaurantId = :restaurantId', {
+              restaurantId: restaurant.id,
+            })
+            .andWhere('order.state = true')
+            .andWhere('order.createdAt BETWEEN :startDate AND :endDate', range)
+            .andWhere('COALESCE(order.deliveredAt, order.estimatedReadyAt) IS NOT NULL')
+            .getRawOne<{ avg: string }>(),
+          this.orderItemRepository
+            .createQueryBuilder('orderItem')
+            .innerJoin('orderItem.order', 'order')
+            .innerJoin('orderItem.product', 'product')
+            .select('product.id', 'productId')
+            .addSelect('product.name', 'name')
+            .addSelect('SUM(orderItem.quantity)', 'orders')
+            .addSelect('SUM(orderItem.subtotal)', 'revenue')
+            .where('order.restaurantId = :restaurantId', {
+              restaurantId: restaurant.id,
+            })
+            .andWhere('order.state = true')
+            .andWhere('orderItem.state = true')
+            .andWhere('product.state = true')
+            .andWhere('order.createdAt BETWEEN :startDate AND :endDate', range)
+            .groupBy('product.id')
+            .addGroupBy('product.name')
+            .orderBy('orders', 'DESC')
+            .addOrderBy('revenue', 'DESC')
+            .limit(topLimit)
+            .getRawMany<{
+              productId: string;
+              name: string;
+              orders: string;
+              revenue: string;
+            }>(),
+        ]);
+
+      return {
+        message: 'Resumen de dashboard obtenido exitosamente',
+        data: {
+          dateLabel: this.getDateLabel(range.endDate),
+          occupiedTables,
+          totalTables,
+          activeOrders,
+          completedOrders: Number(salesSummary?.completedOrders ?? 0),
+          totalSalesToday: Number(salesSummary?.totalSalesToday ?? 0),
+          avgPrepTime: Number(Number(prepRaw?.avg ?? 0).toFixed(2)),
+          topProducts: topRows.map((row, index) => ({
+            rank: index + 1,
+            productId: row.productId,
+            name: row.name,
+            orders: Number(row.orders ?? 0),
+            revenue: Number(row.revenue ?? 0),
+          })),
+        },
+        meta: {
+          startDate: range.startDate.toISOString(),
+          endDate: range.endDate.toISOString(),
+          limit: topLimit,
+        },
+      };
+    } catch (error) {
+      Utils.errorResponse(error);
+    }
   }
 
   async getSalesByDay(query: ReportRangeQueryDto) {
