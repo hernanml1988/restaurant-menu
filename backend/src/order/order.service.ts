@@ -11,6 +11,7 @@ import { ProductExtra } from '../product_extra/entities/product_extra.entity';
 import { Table, TableStatusEnum } from '../table/entities/table.entity';
 import Utils from '../utils/errorUtils';
 import { CreatePublicOrderDto } from './dto/create-public-order.dto';
+import { UpdateOrderDto } from './dto/update-order.dto';
 import {
   Order,
   OrderPriorityEnum,
@@ -39,6 +40,76 @@ export class OrderService {
     return Number(rawResult?.max ?? 0) + 1;
   }
 
+  private async attachRelations(orderId: string) {
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId },
+      relations: {
+        restaurant: true,
+        table: true,
+        diningSession: true,
+        items: {
+          product: true,
+          selectedExtras: {
+            productExtra: true,
+          },
+        },
+      },
+      order: {
+        items: {
+          createdAt: 'ASC',
+          selectedExtras: {
+            createdAt: 'ASC',
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    return order;
+  }
+
+  private async syncTableOrderState(tableId: string) {
+    const table = await this.tableRepository.findOne({
+      where: { id: tableId },
+    });
+
+    if (!table) {
+      return;
+    }
+
+    table.activeOrders = await this.orderRepository.count({
+      where: {
+        table: { id: tableId },
+        state: true,
+        diningSession: {
+          active: true,
+          state: true,
+        },
+      },
+    });
+
+    const activeSessions = await this.diningSessionRepository.count({
+      where: {
+        table: { id: tableId },
+        active: true,
+        state: true,
+      },
+    });
+
+    if (table.activeOrders > 0) {
+      table.serviceStatus = TableStatusEnum.WITH_ORDER;
+    } else if (activeSessions > 0) {
+      table.serviceStatus = TableStatusEnum.OCCUPIED;
+    } else {
+      table.serviceStatus = TableStatusEnum.FREE;
+    }
+
+    await this.tableRepository.save(table);
+  }
+
   private async createOrderItems(
     manager: EntityManager,
     order: Order,
@@ -58,9 +129,7 @@ export class OrderService {
       });
 
       if (!product) {
-        throw new NotFoundException(
-          `Product not found: ${itemDto.productId}`,
-        );
+        throw new NotFoundException(`Product not found: ${itemDto.productId}`);
       }
 
       let extrasSubtotal = 0;
@@ -174,20 +243,20 @@ export class OrderService {
         },
       );
 
-      const table = diningSession.table;
-      table.activeOrders = await this.orderRepository.count({
-        where: {
-          table: { id: table.id },
-          diningSession: {
-            active: true,
-          },
-        },
-      });
-      table.serviceStatus = TableStatusEnum.WITH_ORDER;
-      await this.tableRepository.save(table);
+      await this.syncTableOrderState(diningSession.table.id);
 
-      const createdOrder = await this.orderRepository.findOne({
-        where: { id: savedOrder.id },
+      return {
+        message: 'Pedido creado exitosamente',
+        data: await this.attachRelations(savedOrder.id),
+      };
+    } catch (error) {
+      Utils.errorResponse(error);
+    }
+  }
+
+  async findAll() {
+    try {
+      const orders = await this.orderRepository.find({
         relations: {
           restaurant: true,
           table: true,
@@ -199,11 +268,115 @@ export class OrderService {
             },
           },
         },
+        order: {
+          createdAt: 'DESC',
+          items: {
+            createdAt: 'ASC',
+            selectedExtras: {
+              createdAt: 'ASC',
+            },
+          },
+        },
       });
 
       return {
-        message: 'Pedido creado exitosamente',
-        data: createdOrder,
+        message: 'Pedidos obtenidos exitosamente',
+        data: orders,
+      };
+    } catch (error) {
+      Utils.errorResponse(error);
+    }
+  }
+
+  async findOne(id: string) {
+    try {
+      return {
+        message: 'Pedido obtenido exitosamente',
+        data: await this.attachRelations(id),
+      };
+    } catch (error) {
+      Utils.errorResponse(error);
+    }
+  }
+
+  async update(id: string, updateOrderDto: UpdateOrderDto) {
+    try {
+      const order = await this.attachRelations(id);
+
+      Object.assign(order, {
+        orderStatus: updateOrderDto.orderStatus ?? order.orderStatus,
+        priority: updateOrderDto.priority ?? order.priority,
+        station: updateOrderDto.station ?? order.station,
+        state: updateOrderDto.state ?? order.state,
+      });
+
+      if (updateOrderDto.observations !== undefined) {
+        const observations = updateOrderDto.observations.trim();
+        order.observations = observations ? observations : null;
+      }
+
+      if (updateOrderDto.estimatedReadyAt !== undefined) {
+        order.estimatedReadyAt = updateOrderDto.estimatedReadyAt
+          ? new Date(updateOrderDto.estimatedReadyAt)
+          : null;
+      }
+
+      if (updateOrderDto.deliveredAt !== undefined) {
+        order.deliveredAt = updateOrderDto.deliveredAt
+          ? new Date(updateOrderDto.deliveredAt)
+          : null;
+      } else if (
+        updateOrderDto.orderStatus === OrderStatusEnum.DELIVERED &&
+        !order.deliveredAt
+      ) {
+        order.deliveredAt = new Date();
+      } else if (
+        updateOrderDto.orderStatus &&
+        updateOrderDto.orderStatus !== OrderStatusEnum.DELIVERED
+      ) {
+        order.deliveredAt = null;
+      }
+
+      if (
+        updateOrderDto.orderStatus === OrderStatusEnum.READY &&
+        !order.estimatedReadyAt
+      ) {
+        order.estimatedReadyAt = new Date();
+      }
+
+      const updatedOrder = await this.orderRepository.save(order);
+      await this.syncTableOrderState(order.table.id);
+
+      return {
+        message: 'Pedido actualizado exitosamente',
+        data: await this.attachRelations(updatedOrder.id),
+      };
+    } catch (error) {
+      Utils.errorResponse(error);
+    }
+  }
+
+  async remove(id: string) {
+    try {
+      const order = await this.attachRelations(id);
+
+      if (!order.state) {
+        return {
+          message: 'Pedido desactivado exitosamente',
+          data: order,
+        };
+      }
+
+      order.state = false;
+      order.status = 'inactive';
+      order.deletedAt = new Date();
+
+      const deletedOrder = await this.orderRepository.save(order);
+      await this.syncTableOrderState(order.table.id);
+
+      return {
+        message: 'Pedido desactivado exitosamente',
+        data: await this.attachRelations(deletedOrder.id),
       };
     } catch (error) {
       Utils.errorResponse(error);
