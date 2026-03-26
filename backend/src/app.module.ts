@@ -29,6 +29,7 @@ import { DiningSessionModule } from './dining_session/dining_session.module';
 import { OrderModule } from './order/order.module';
 import { CategoryModule } from './category/category.module';
 import { ProductModule } from './product/product.module';
+import { ReportModule } from './report/report.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
@@ -72,6 +73,7 @@ import { ProductModule } from './product/product.module';
     ProductModule,
     DiningSessionModule,
     OrderModule,
+    ReportModule,
   ],
   controllers: [AppController],
   providers: [AppService],
