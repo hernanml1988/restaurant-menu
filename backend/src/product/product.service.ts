@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { Category } from '../category/entities/category.entity';
 import { ProductExtra } from '../product_extra/entities/product_extra.entity';
 import { Restaurant } from '../restaurant/entities/restaurant.entity';
+import { RestaurantService } from '../restaurant/restaurant.service';
 import Utils from '../utils/errorUtils';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -24,6 +25,7 @@ export class ProductService {
     private readonly categoryRepository: Repository<Category>,
     @InjectRepository(ProductExtra)
     private readonly productExtraRepository: Repository<ProductExtra>,
+    private readonly restaurantService: RestaurantService,
   ) {}
 
   private sanitizeOptionalText(value?: string | null) {
@@ -158,11 +160,18 @@ export class ProductService {
         available: createProductDto.available ?? true,
         popular: createProductDto.popular ?? false,
         promo: createProductDto.promo ?? false,
+        trackStock: createProductDto.trackStock ?? false,
+        stockQuantity: createProductDto.stockQuantity ?? 0,
+        stockAlertThreshold: createProductDto.stockAlertThreshold ?? 0,
         allergens: this.sanitizeAllergens(createProductDto.allergens) ?? [],
         state: createProductDto.state ?? true,
         restaurant,
         category,
       });
+
+      if (product.trackStock && product.stockQuantity <= 0) {
+        product.available = false;
+      }
 
       const newProduct = await this.productRepository.save(product);
       await this.syncCategoryCount(category.id);
@@ -170,6 +179,39 @@ export class ProductService {
       return {
         message: 'Producto creado exitosamente',
         data: await this.attachRelations(newProduct.id),
+      };
+    } catch (error) {
+      Utils.errorResponse(error);
+    }
+  }
+
+  async findPublicAll() {
+    try {
+      const restaurant = await this.restaurantService.getCurrentRestaurantEntity();
+      const products = await this.productRepository.find({
+        where: {
+          restaurant: { id: restaurant.id },
+          state: true,
+          category: {
+            state: true,
+          },
+        },
+        relations: {
+          restaurant: true,
+          category: true,
+          extras: true,
+        },
+        order: {
+          name: 'ASC',
+          extras: {
+            name: 'ASC',
+          },
+        },
+      });
+
+      return {
+        message: 'Productos publicos obtenidos exitosamente',
+        data: products,
       };
     } catch (error) {
       Utils.errorResponse(error);
@@ -207,6 +249,43 @@ export class ProductService {
 
       return {
         message: 'Producto obtenido exitosamente',
+        data: product,
+      };
+    } catch (error) {
+      Utils.errorResponse(error);
+    }
+  }
+
+  async findPublicOne(id: string) {
+    try {
+      const restaurant = await this.restaurantService.getCurrentRestaurantEntity();
+      const product = await this.productRepository.findOne({
+        where: {
+          id,
+          restaurant: { id: restaurant.id },
+          state: true,
+          category: {
+            state: true,
+          },
+        },
+        relations: {
+          restaurant: true,
+          category: true,
+          extras: true,
+        },
+        order: {
+          extras: {
+            name: 'ASC',
+          },
+        },
+      });
+
+      if (!product) {
+        throw new NotFoundException('Product not found');
+      }
+
+      return {
+        message: 'Producto publico obtenido exitosamente',
         data: product,
       };
     } catch (error) {
@@ -261,8 +340,16 @@ export class ProductService {
         available: updateProductDto.available ?? product.available,
         popular: updateProductDto.popular ?? product.popular,
         promo: updateProductDto.promo ?? product.promo,
+        trackStock: updateProductDto.trackStock ?? product.trackStock,
+        stockQuantity: updateProductDto.stockQuantity ?? product.stockQuantity,
+        stockAlertThreshold:
+          updateProductDto.stockAlertThreshold ?? product.stockAlertThreshold,
         state: updateProductDto.state ?? product.state,
       });
+
+      if (product.trackStock && product.stockQuantity <= 0) {
+        product.available = false;
+      }
 
       const nextImage = this.sanitizeOptionalText(updateProductDto.image);
       if (nextImage !== undefined) {

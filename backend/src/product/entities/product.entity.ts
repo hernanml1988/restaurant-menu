@@ -42,6 +42,15 @@ export class Product {
   @Column({ default: false })
   promo: boolean;
 
+  @Column({ default: false })
+  trackStock: boolean;
+
+  @Column({ default: 0 })
+  stockQuantity: number;
+
+  @Column({ default: 0 })
+  stockAlertThreshold: number;
+
   @Column('text', { array: true, default: '{}' })
   allergens: string[];
 

@@ -65,6 +65,13 @@ export async function getCategoriesRequest() {
   return requestCategoryApi<CategoryRecord[]>('/category', { method: 'GET' });
 }
 
+export async function getPublicCategoriesRequest() {
+  return requestCategoryApi<CategoryRecord[]>('/category/public', {
+    method: 'GET',
+    credentials: 'omit',
+  });
+}
+
 export async function createCategoryRequest(payload: CreateCategoryPayload) {
   return requestCategoryApi<CategoryRecord>('/category', {
     method: 'POST',

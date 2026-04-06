@@ -1,22 +1,23 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Response } from 'express';
-import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import Utils from '../utils/errorUtils';
-import { UserService } from '../user/user.service';
-import { User } from '../user/entities/user.entity';
 import { StatusEnum } from '../enums/status.enum';
-
-type InternalModuleRole = 'admin' | 'kitchen';
+import Utils from '../utils/errorUtils';
+import { User } from '../user/entities/user.entity';
+import { UserService } from '../user/user.service';
+import { buildAuthCookieOptions } from './auth-cookie-options';
+import {
+  InternalModuleRole,
+  mapRoleNameToInternalRole,
+} from './internal-role.util';
 
 @Injectable()
 export class AuthService {
@@ -32,27 +33,9 @@ export class AuthService {
     const roleNames =
       user?.profile?.profileRoles
         ?.map((profileRole: any) => profileRole?.role?.name)
-        .filter(Boolean)
-        .map((roleName: string) =>
-          roleName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
-        ) ?? [];
+        .filter(Boolean) ?? [];
 
-    if (roleNames.some((roleName: string) => roleName.includes('admin'))) {
-      return 'admin';
-    }
-
-    if (
-      roleNames.some(
-        (roleName: string) =>
-          roleName.includes('cocina') ||
-          roleName.includes('kitchen') ||
-          roleName.includes('chef'),
-      )
-    ) {
-      return 'kitchen';
-    }
-
-    return null;
+    return mapRoleNameToInternalRole(roleNames);
   }
 
   private buildAuthUser(user: any) {
@@ -73,8 +56,7 @@ export class AuthService {
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.userService.findByEmail(email);
     if (user && (await bcrypt.compare(password, user.password))) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password, ...result } = user;
+      const { password: _password, ...result } = user;
       return result;
     }
     throw new UnauthorizedException('Credenciales incorrectas');
@@ -88,31 +70,25 @@ export class AuthService {
     }
 
     const authUser = this.buildAuthUser(user);
-    
+
     if (!authUser.role) {
       return res.status(403).send({
         message: 'El usuario no tiene un rol interno compatible.',
       });
     }
 
-    const payload = { email: user.username, sub: user.id };
+    const payload = {
+      email: user.username,
+      username: user.username,
+      sub: user.id,
+      role: authUser.role,
+    };
 
     const token = this.jwtService.sign(payload, { expiresIn: '1h' });
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
 
-    res.cookie('jwt', token, {
-      httpOnly: true,
-      sameSite: 'strict',
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 3600000,
-    });
-
-    res.cookie('refresh_token', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 604800000,
-    });
+    res.cookie('jwt', token, buildAuthCookieOptions(3600000));
+    res.cookie('refresh_token', refreshToken, buildAuthCookieOptions(604800000));
 
     res.send({ message: 'Login exitoso', data: authUser });
   }
@@ -120,7 +96,7 @@ export class AuthService {
   async validateToken(token: string): Promise<any> {
     try {
       return this.jwtService.verify(token);
-    } catch (error) {
+    } catch {
       throw new Error('Invalid or expired token');
     }
   }
@@ -167,8 +143,7 @@ export class AuthService {
         return false;
       }
 
-      const isValidToken = await bcrypt.compare(token, user.resetPasswordToken);
-      return isValidToken;
+      return bcrypt.compare(token, user.resetPasswordToken);
     } catch {
       return false;
     }
@@ -202,7 +177,7 @@ export class AuthService {
       user.resetPasswordToken = null;
       user.tkresetpassExpires = null;
       await this.userRepository.save(user);
-    } catch (error) {
+    } catch {
       throw new BadRequestException('Error al restablecer la contrasena');
     }
   }
@@ -211,16 +186,14 @@ export class AuthService {
     try {
       const decoded = this.jwtService.verify(token);
       return !!decoded;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
 
   async validateUserRegisterLogin(email: string): Promise<any> {
     const user = await this.userService.findByEmail(email);
-    const { password, ...result } = user;
+    const { password: _password, ...result } = user;
     return result;
-
-    throw new UnauthorizedException('Credenciales incorrectas');
   }
 }

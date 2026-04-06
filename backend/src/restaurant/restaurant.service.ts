@@ -23,7 +23,7 @@ export class RestaurantService {
     private readonly restaurantRepository: Repository<Restaurant>,
   ) {}
 
-  private async ensureCurrentRestaurant() {
+  async getCurrentRestaurantEntity() {
     const existingRestaurant = await this.restaurantRepository.findOne({
       where: {
         state: true,
@@ -43,7 +43,7 @@ export class RestaurantService {
 
   async findCurrent() {
     try {
-      const restaurant = await this.ensureCurrentRestaurant();
+      const restaurant = await this.getCurrentRestaurantEntity();
 
       return {
         message: 'Restaurante obtenido exitosamente',
@@ -56,7 +56,7 @@ export class RestaurantService {
 
   async updateCurrent(updateRestaurantProfileDto: UpdateRestaurantProfileDto) {
     try {
-      const restaurant = await this.ensureCurrentRestaurant();
+      const restaurant = await this.getCurrentRestaurantEntity();
 
       Object.assign(restaurant, {
         name: updateRestaurantProfileDto.name ?? restaurant.name,
@@ -86,7 +86,7 @@ export class RestaurantService {
 
   async resetCurrent() {
     try {
-      const restaurant = await this.ensureCurrentRestaurant();
+      const restaurant = await this.getCurrentRestaurantEntity();
 
       Object.assign(restaurant, defaultRestaurantProfile);
 

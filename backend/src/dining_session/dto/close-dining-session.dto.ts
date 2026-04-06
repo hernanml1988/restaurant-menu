@@ -4,4 +4,8 @@ export class CloseDiningSessionDto {
   @IsOptional()
   @IsString()
   closedBy?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }

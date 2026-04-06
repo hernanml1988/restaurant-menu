@@ -66,6 +66,21 @@ export class Order {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   total: number;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  subtotalBeforeDiscount: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  discountAmount: number;
+
+  @Column({ nullable: true, default: null })
+  discountType: string | null;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  discountValue: number;
+
+  @Column({ type: 'text', nullable: true, default: null })
+  discountReason: string | null;
+
   @Column({ nullable: true, default: null })
   orderedAtLabel: string;
 
@@ -74,6 +89,15 @@ export class Order {
 
   @Column({ nullable: true, default: null })
   deliveredAt: Date;
+
+  @Column({ type: 'text', nullable: true, default: null })
+  cancelReason: string | null;
+
+  @Column({ nullable: true, default: null })
+  cancelledAt: Date | null;
+
+  @Column({ nullable: true, default: null })
+  cancelledBy: string | null;
 
   @Column({ default: true })
   state: boolean;

@@ -25,6 +25,9 @@ export interface ProductRecord {
   available: boolean;
   popular: boolean;
   promo: boolean;
+  trackStock: boolean;
+  stockQuantity: number;
+  stockAlertThreshold: number;
   allergens: string[];
   state: boolean;
   category?: {
@@ -50,6 +53,9 @@ export interface CreateProductPayload {
   available?: boolean;
   popular?: boolean;
   promo?: boolean;
+  trackStock?: boolean;
+  stockQuantity?: number;
+  stockAlertThreshold?: number;
   allergens?: string[];
   state?: boolean;
 }
@@ -65,6 +71,9 @@ export interface UpdateProductPayload {
   available?: boolean;
   popular?: boolean;
   promo?: boolean;
+  trackStock?: boolean;
+  stockQuantity?: number;
+  stockAlertThreshold?: number;
   allergens?: string[];
   state?: boolean;
 }
@@ -100,6 +109,20 @@ async function requestProductApi<T>(input: string, init?: RequestInit) {
 
 export async function getProductsRequest() {
   return requestProductApi<ProductRecord[]>('/product', { method: 'GET' });
+}
+
+export async function getPublicProductsRequest() {
+  return requestProductApi<ProductRecord[]>('/product/public', {
+    method: 'GET',
+    credentials: 'omit',
+  });
+}
+
+export async function getPublicProductRequest(productId: string) {
+  return requestProductApi<ProductRecord>(`/product/public/${productId}`, {
+    method: 'GET',
+    credentials: 'omit',
+  });
 }
 
 export async function createProductRequest(payload: CreateProductPayload) {

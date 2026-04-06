@@ -5,11 +5,14 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, In, MoreThan, Repository } from 'typeorm';
+import { CashSession, CashSessionStatusEnum } from '../cash_session/entities/cash_session.entity';
 import { DiningSession } from '../dining_session/entities/dining_session.entity';
 import { Order } from '../order/entities/order.entity';
 import { OrderStatusEnum } from '../order/entities/order.entity';
 import { OrderItem } from '../order/entities/order_item.entity';
+import { Product } from '../product/entities/product.entity';
 import { Restaurant } from '../restaurant/entities/restaurant.entity';
+import { Reservation } from '../reservation/entities/reservation.entity';
 import { Table } from '../table/entities/table.entity';
 import Utils from '../utils/errorUtils';
 import { ReportRangeQueryDto } from './dto/report-range-query.dto';
@@ -29,10 +32,16 @@ export class ReportService {
     private readonly orderRepository: Repository<Order>,
     @InjectRepository(OrderItem)
     private readonly orderItemRepository: Repository<OrderItem>,
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
     @InjectRepository(DiningSession)
     private readonly diningSessionRepository: Repository<DiningSession>,
     @InjectRepository(Table)
     private readonly tableRepository: Repository<Table>,
+    @InjectRepository(CashSession)
+    private readonly cashSessionRepository: Repository<CashSession>,
+    @InjectRepository(Reservation)
+    private readonly reservationRepository: Repository<Reservation>,
   ) {}
 
   private async resolveCurrentRestaurant() {
@@ -109,7 +118,7 @@ export class ReportService {
       const range = this.resolveRange(query);
       const topLimit = query.limit ?? 5;
 
-      const [totalTables, occupiedTables, activeOrders, salesSummary, prepRaw, topRows] =
+      const [totalTables, occupiedTables, activeOrders, salesSummary, prepRaw, topRows, stockAlerts, todayReservations, openCashSession, discountsRaw] =
         await Promise.all([
           this.tableRepository.count({
             where: {
@@ -194,6 +203,54 @@ export class ReportService {
               orders: string;
               revenue: string;
             }>(),
+          this.productRepository.count({
+            where: {
+              restaurant: { id: restaurant.id },
+              state: true,
+              trackStock: true,
+              stockQuantity: MoreThan(-1),
+            },
+          }).then(async () => {
+            const products = await this.productRepository.find({
+              where: {
+                restaurant: { id: restaurant.id },
+                state: true,
+                trackStock: true,
+              },
+            });
+
+            return products.filter(
+              (product) =>
+                Number(product.stockQuantity ?? 0) <=
+                Number(product.stockAlertThreshold ?? 0),
+            ).length;
+          }),
+          this.reservationRepository.count({
+            where: {
+              restaurant: { id: restaurant.id },
+              state: true,
+              reservationAt: Between(range.startDate, range.endDate),
+            },
+          }),
+          this.cashSessionRepository.findOne({
+            where: {
+              restaurant: { id: restaurant.id },
+              state: true,
+              sessionStatus: CashSessionStatusEnum.OPEN,
+            },
+            order: {
+              openedAt: 'DESC',
+            },
+          }),
+          this.orderRepository
+            .createQueryBuilder('order')
+            .select('COALESCE(SUM(order.discountAmount), 0)', 'total')
+            .where('order.restaurantId = :restaurantId', {
+              restaurantId: restaurant.id,
+            })
+            .andWhere('order.state = true')
+            .andWhere('order.createdAt BETWEEN :startDate AND :endDate', range)
+            .getRawOne<{ total: string }>(),
         ]);
 
       return {
@@ -206,6 +263,10 @@ export class ReportService {
           completedOrders: Number(salesSummary?.completedOrders ?? 0),
           totalSalesToday: Number(salesSummary?.totalSalesToday ?? 0),
           avgPrepTime: Number(Number(prepRaw?.avg ?? 0).toFixed(2)),
+          stockAlerts,
+          todayReservations,
+          hasOpenCashSession: !!openCashSession,
+          discountsToday: Number(discountsRaw?.total ?? 0),
           topProducts: topRows.map((row, index) => ({
             rank: index + 1,
             productId: row.productId,

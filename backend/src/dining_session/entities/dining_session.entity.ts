@@ -9,9 +9,17 @@ import {
 } from 'typeorm';
 import { StatusEnum } from '../../enums/status.enum';
 import { Order } from '../../order/entities/order.entity';
+import { Payment } from '../../payment/entities/payment.entity';
 import { Restaurant } from '../../restaurant/entities/restaurant.entity';
 import { ServiceRequest } from '../../service_request/entities/service_request.entity';
 import { Table } from '../../table/entities/table.entity';
+
+export enum DiningSessionAccountStatusEnum {
+  OPEN = 'open',
+  PAYMENT_PENDING = 'payment-pending',
+  PAID = 'paid',
+  CLOSED = 'closed',
+}
 
 @Entity('dining_sessions')
 export class DiningSession {
@@ -29,6 +37,13 @@ export class DiningSession {
 
   @Column({ nullable: true, default: null })
   closedAt: Date;
+
+  @Column({
+    type: 'enum',
+    enum: DiningSessionAccountStatusEnum,
+    default: DiningSessionAccountStatusEnum.OPEN,
+  })
+  accountStatus: DiningSessionAccountStatusEnum;
 
   @Column({ default: true })
   state: boolean;
@@ -63,6 +78,9 @@ export class DiningSession {
 
   @OneToMany(() => Order, (order) => order.diningSession)
   orders: Order[];
+
+  @OneToMany(() => Payment, (payment) => payment.diningSession)
+  payments: Payment[];
 
   @OneToMany(
     () => ServiceRequest,

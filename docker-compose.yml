@@ -20,7 +20,7 @@ services:
   backend:
     build:
       context: ./backend
-      target: development
+      target: production
     container_name: restaurant-menu-backend
     restart: unless-stopped
     depends_on:
@@ -33,35 +33,20 @@ services:
       DATABASE_USERNAME: postgres
       DATABASE_PASSWORD: 123456789
       DATABASE_NAME: calendar
-      CHOKIDAR_USEPOLLING: "true"
-      WATCHPACK_POLLING: "true"
     ports:
       - "3015:3015"
-    command: npm run start:dev:docker
-    volumes:
-      - ./backend:/app
-      - backend_node_modules:/app/node_modules
 
   frontend:
     build:
       context: ./mesa-magica
-      target: development
+      target: production
     container_name: restaurant-menu-frontend
     restart: unless-stopped
     depends_on:
-      - backend
-    environment:
-      VITE_API_URL: http://localhost:3015
-      CHOKIDAR_USEPOLLING: "true"
-      WATCHPACK_POLLING: "true"
+      backend:
+        condition: service_started
     ports:
-      - "8080:8080"
-    command: npm run dev -- --host 0.0.0.0 --port 8080
-    volumes:
-      - ./mesa-magica:/app
-      - frontend_node_modules:/app/node_modules
+      - "8080:80"
 
 volumes:
   postgres_data:
-  backend_node_modules:
-  frontend_node_modules:

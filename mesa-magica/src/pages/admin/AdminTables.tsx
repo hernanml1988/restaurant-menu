@@ -1,9 +1,10 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import {
   useMutation,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import QRCode from 'qrcode';
 import {
   Pencil,
   Plus,
@@ -94,6 +95,53 @@ const defaultTableFormState: TableFormState = {
   activeOrders: '0',
   qrCode: '',
 };
+
+function QrPreview({ value }: { value: string }) {
+  const [qrDataUrl, setQrDataUrl] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+
+    const generateQr = async () => {
+      try {
+        const dataUrl = await QRCode.toDataURL(value, {
+          width: 192,
+          margin: 1,
+        });
+
+        if (mounted) {
+          setQrDataUrl(dataUrl);
+        }
+      } catch {
+        if (mounted) {
+          setQrDataUrl('');
+        }
+      }
+    };
+
+    void generateQr();
+
+    return () => {
+      mounted = false;
+    };
+  }, [value]);
+
+  if (!qrDataUrl) {
+    return (
+      <div className="mx-auto mb-2 flex h-32 w-32 items-center justify-center rounded-xl border-2 border-dashed border-border bg-card">
+        <QrCode className="h-16 w-16 text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={qrDataUrl}
+      alt="QR de mesa"
+      className="mx-auto mb-2 h-32 w-32 rounded-xl border bg-white p-2"
+    />
+  );
+}
 
 export default function AdminTables() {
   const [activeZone, setActiveZone] = useState('Todas');
@@ -448,9 +496,7 @@ export default function AdminTables() {
 
                 {showQR === table.id && (
                   <div className="mt-3 animate-scale-in rounded-xl bg-muted p-4 text-center">
-                    <div className="mx-auto mb-2 flex h-32 w-32 items-center justify-center rounded-xl border-2 border-dashed border-border bg-card">
-                      <QrCode className="h-16 w-16 text-muted-foreground" />
-                    </div>
+                    <QrPreview value={table.qrCode} />
                     <p className="text-xs font-mono text-muted-foreground">
                       {table.qrCode}
                     </p>

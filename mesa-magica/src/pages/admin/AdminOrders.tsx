@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
+  Bell,
   Clock3,
   Edit,
   Eye,
@@ -31,7 +32,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/context/AuthContext';
 import { toast } from '@/components/ui/use-toast';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import AdminBillingDialog from './AdminBillingDialog';
+import { getDiningSessionAccountRequest } from '@/services/diningSessionService';
 import {
   deactivateOrderRequest,
   getOrderRequest,
@@ -42,6 +47,17 @@ import {
   type OrderStation,
   type OrderStatus,
 } from '@/services/orderService';
+import {
+  getPaymentsBySessionRequest,
+  type PaymentMethod,
+  type PaymentRecord,
+} from '@/services/paymentService';
+import { createInternalRealtimeSource } from '@/services/realtimeService';
+import {
+  getServiceRequestsRequest,
+  updateServiceRequestRequest,
+  type ServiceRequestRecord,
+} from '@/services/serviceRequestService';
 
 type OrderForm = {
   orderStatus: OrderStatus;
@@ -50,6 +66,9 @@ type OrderForm = {
   observations: string;
   estimatedReadyAt: string;
   deliveredAt: string;
+  discountType: 'percentage' | 'fixed' | '';
+  discountValue: string;
+  discountReason: string;
 };
 
 const statusConfig: Record<
@@ -100,6 +119,15 @@ const emptyOrderForm: OrderForm = {
   observations: '',
   estimatedReadyAt: '',
   deliveredAt: '',
+  discountType: '',
+  discountValue: '0',
+  discountReason: '',
+};
+
+const paymentMethodLabels: Record<PaymentMethod, string> = {
+  cash: 'Efectivo',
+  card: 'Tarjeta',
+  transfer: 'Transferencia',
 };
 
 function formatMoney(value: number) {
@@ -158,17 +186,23 @@ function getOrderSearchableText(order: OrderRecord) {
 }
 
 export default function AdminOrders() {
+  const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [activeStatus, setActiveStatus] = useState<OrderStatus | 'all'>('all');
   const [editingOrder, setEditingOrder] = useState<OrderRecord | null>(null);
   const [viewingOrderId, setViewingOrderId] = useState<string | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<OrderRecord | null>(null);
+  const [billingSessionToken, setBillingSessionToken] = useState<string | null>(null);
   const [orderForm, setOrderForm] = useState<OrderForm>(emptyOrderForm);
   const queryClient = useQueryClient();
 
   const ordersQuery = useQuery({
     queryKey: ['admin', 'orders'],
     queryFn: getOrdersRequest,
+  });
+  const serviceRequestsQuery = useQuery({
+    queryKey: ['admin', 'service-requests'],
+    queryFn: getServiceRequestsRequest,
   });
 
   const orderDetailQuery = useQuery({
@@ -177,7 +211,31 @@ export default function AdminOrders() {
     enabled: !!viewingOrderId,
   });
 
+  const selectedOrderSessionToken =
+    orderDetailQuery.data?.diningSession?.sessionToken ?? null;
+
+  const orderAccountQuery = useQuery({
+    queryKey: ['admin', 'order-detail', 'account', selectedOrderSessionToken],
+    queryFn: () => getDiningSessionAccountRequest(selectedOrderSessionToken as string),
+    enabled: !!selectedOrderSessionToken,
+  });
+
+  const orderPaymentsQuery = useQuery({
+    queryKey: ['admin', 'order-detail', 'payments', selectedOrderSessionToken],
+    queryFn: () => getPaymentsBySessionRequest(selectedOrderSessionToken as string),
+    enabled: !!selectedOrderSessionToken,
+  });
+
   const orders = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
+  const serviceRequests = useMemo(
+    () => serviceRequestsQuery.data ?? [],
+    [serviceRequestsQuery.data],
+  );
+  const pendingServiceRequests = useMemo(
+    () =>
+      serviceRequests.filter((serviceRequest) => serviceRequest.requestStatus === 'pending'),
+    [serviceRequests],
+  );
   const activeOrders = useMemo(
     () => orders.filter((order) => order.state),
     [orders],
@@ -207,6 +265,9 @@ export default function AdminOrders() {
       observations: editingOrder.observations ?? '',
       estimatedReadyAt: formatDateInput(editingOrder.estimatedReadyAt),
       deliveredAt: formatDateInput(editingOrder.deliveredAt),
+      discountType: (editingOrder.discountType as 'percentage' | 'fixed' | '') ?? '',
+      discountValue: String(editingOrder.discountValue ?? 0),
+      discountReason: editingOrder.discountReason ?? '',
     });
   }, [editingOrder]);
 
@@ -218,6 +279,20 @@ export default function AdminOrders() {
       });
     }
   };
+
+  const refreshServiceRequests = () => {
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'service-requests'] });
+  };
+
+  useRealtimeSubscription(createInternalRealtimeSource, ({ event }) => {
+    if (event.startsWith('order.')) {
+      refreshOrders(viewingOrderId);
+    }
+
+    if (event.startsWith('service-request.')) {
+      refreshServiceRequests();
+    }
+  });
 
   const updateOrder = useMutation({
     mutationFn: ({
@@ -241,10 +316,11 @@ export default function AdminOrders() {
   });
 
   const deleteOrder = useMutation({
-    mutationFn: deactivateOrderRequest,
-    onSuccess: (_, orderId) => {
-      refreshOrders(orderId);
-      if (viewingOrderId === orderId) {
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      deactivateOrderRequest(id, reason),
+    onSuccess: (_, variables) => {
+      refreshOrders(variables.id);
+      if (viewingOrderId === variables.id) {
         setViewingOrderId(null);
       }
       setOrderToDelete(null);
@@ -253,6 +329,25 @@ export default function AdminOrders() {
     onError: (error) =>
       toast({
         title: 'No se pudo eliminar el pedido',
+        description: error instanceof Error ? error.message : 'Error inesperado.',
+        variant: 'destructive',
+      }),
+  });
+  const updateServiceRequest = useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: Parameters<typeof updateServiceRequestRequest>[1];
+    }) => updateServiceRequestRequest(id, payload),
+    onSuccess: () => {
+      refreshServiceRequests();
+      toast({ title: 'Solicitud actualizada' });
+    },
+    onError: (error) =>
+      toast({
+        title: 'No se pudo actualizar la solicitud',
         description: error instanceof Error ? error.message : 'Error inesperado.',
         variant: 'destructive',
       }),
@@ -278,12 +373,19 @@ export default function AdminOrders() {
         deliveredAt: orderForm.deliveredAt
           ? new Date(orderForm.deliveredAt).toISOString()
           : null,
+        discountType: orderForm.discountType || null,
+        discountValue: Number(orderForm.discountValue || 0),
+        discountReason: orderForm.discountReason || null,
       },
     });
   };
 
   const loadingError = ordersQuery.error;
   const selectedOrder = orderDetailQuery.data ?? null;
+  const selectedOrderAccount = orderAccountQuery.data ?? null;
+  const selectedOrderPayments = orderPaymentsQuery.data ?? [];
+  const orderHasPayments =
+    (selectedOrderAccount?.paidAmount ?? 0) > 0 && selectedOrderPayments.length > 0;
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -315,6 +417,112 @@ export default function AdminOrders() {
           </AlertDescription>
         </Alert>
       )}
+
+      {serviceRequestsQuery.error && (
+        <Alert className="border-destructive/30 bg-destructive/5">
+          <AlertTitle>No se pudieron cargar las solicitudes</AlertTitle>
+          <AlertDescription>
+            {serviceRequestsQuery.error instanceof Error
+              ? serviceRequestsQuery.error.message
+              : 'Verifica la sesion activa y la API.'}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <section className="rounded-2xl border bg-card">
+        <div className="flex items-center justify-between gap-4 border-b p-5">
+          <div>
+            <h2 className="font-display text-2xl">Solicitudes de servicio</h2>
+            <p className="text-sm text-muted-foreground">
+              Llamados de mesero, cuenta y ayuda emitidos por cliente en tiempo real.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-xl bg-primary/10 px-3 py-2 text-sm font-medium text-primary">
+            <Bell className="h-4 w-4" />
+            {pendingServiceRequests.length} pendientes
+          </div>
+        </div>
+
+        <div className="p-5">
+          {serviceRequestsQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">Cargando solicitudes...</p>
+          ) : pendingServiceRequests.length ? (
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {pendingServiceRequests.map((serviceRequest) => (
+                <div key={serviceRequest.id} className="rounded-xl border p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-medium">
+                        {serviceRequest.table?.name ?? 'Mesa no determinada'}
+                      </p>
+                      <p className="text-sm capitalize text-muted-foreground">
+                        {serviceRequest.type === 'waiter'
+                          ? 'Llamar mesero'
+                          : serviceRequest.type === 'bill'
+                            ? 'Solicitar cuenta'
+                            : 'Necesita ayuda'}
+                      </p>
+                    </div>
+                    <span className="rounded-lg bg-status-pending/10 px-2.5 py-1 text-xs font-medium text-status-pending">
+                      Pendiente
+                    </span>
+                  </div>
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    {formatDateTime(serviceRequest.createdAt)}
+                  </p>
+                  <p className="mt-2 text-sm">
+                    {serviceRequest.notes || 'Sin observaciones del cliente.'}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {serviceRequest.type === 'bill' && (
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          setBillingSessionToken(
+                            serviceRequest.diningSession?.sessionToken ?? null,
+                          )
+                        }
+                        disabled={!serviceRequest.diningSession?.sessionToken}
+                      >
+                        Cobrar cuenta
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        updateServiceRequest.mutate({
+                          id: serviceRequest.id,
+                          payload: { requestStatus: 'attended' },
+                        })
+                      }
+                      disabled={updateServiceRequest.isPending}
+                    >
+                      Marcar atendida
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        updateServiceRequest.mutate({
+                          id: serviceRequest.id,
+                          payload: { requestStatus: 'cancelled' },
+                        })
+                      }
+                      disabled={updateServiceRequest.isPending}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No hay solicitudes de servicio pendientes.
+            </p>
+          )}
+        </div>
+      </section>
 
       <section className="rounded-2xl border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b p-5">
@@ -465,6 +673,20 @@ export default function AdminOrders() {
         </div>
       </section>
 
+      <AdminBillingDialog
+        open={!!billingSessionToken}
+        sessionToken={billingSessionToken}
+        actorEmail={user?.email}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBillingSessionToken(null);
+          }
+        }}
+        onBillingUpdated={() => {
+          refreshServiceRequests();
+        }}
+      />
+
       <Dialog
         open={!!viewingOrderId}
         onOpenChange={(open) => {
@@ -609,6 +831,104 @@ export default function AdminOrders() {
                   {selectedOrder.observations || 'Sin observaciones.'}
                 </p>
               </div>
+
+              {selectedOrder.diningSession?.sessionToken && (
+                <div className="rounded-xl border bg-muted/20 p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                    Estado de pago
+                  </p>
+                  {orderAccountQuery.isLoading ? (
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Cargando estado de pago...
+                    </p>
+                  ) : orderAccountQuery.error ? (
+                    <p className="mt-2 text-sm text-destructive">
+                      No se pudo obtener el estado de pago.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="mt-2 font-medium">
+                        {orderHasPayments ? 'Pagado' : 'No pagado'}
+                      </p>
+
+                      {orderHasPayments && (
+                        <div className="mt-4 space-y-3">
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 text-sm">
+                            <div className="rounded-lg border bg-background p-3">
+                              <p className="text-xs text-muted-foreground">Total cuenta</p>
+                              <p className="mt-1 font-medium">
+                                {formatMoney(selectedOrderAccount?.totalAccount ?? 0)}
+                              </p>
+                            </div>
+                            <div className="rounded-lg border bg-background p-3">
+                              <p className="text-xs text-muted-foreground">Pagado</p>
+                              <p className="mt-1 font-medium">
+                                {formatMoney(selectedOrderAccount?.paidAmount ?? 0)}
+                              </p>
+                            </div>
+                            <div className="rounded-lg border bg-background p-3">
+                              <p className="text-xs text-muted-foreground">Propina</p>
+                              <p className="mt-1 font-medium">
+                                {formatMoney(selectedOrderAccount?.tipAmount ?? 0)}
+                              </p>
+                            </div>
+                            <div className="rounded-lg border bg-background p-3">
+                              <p className="text-xs text-muted-foreground">Vuelto</p>
+                              <p className="mt-1 font-medium">
+                                {formatMoney(selectedOrderAccount?.changeAmount ?? 0)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {orderPaymentsQuery.isLoading ? (
+                            <p className="text-sm text-muted-foreground">
+                              Cargando detalle de pagos...
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {selectedOrderPayments
+                                .filter((payment: PaymentRecord) => payment.paymentStatus === 'paid')
+                                .map((payment: PaymentRecord) => (
+                                  <div
+                                    key={payment.id}
+                                    className="rounded-lg border bg-background p-3"
+                                  >
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                      <div>
+                                        <p className="font-medium">
+                                          {paymentMethodLabels[payment.method]}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {formatDateTime(payment.paidAt)}
+                                        </p>
+                                      </div>
+                                      <p className="font-medium">
+                                        {formatMoney(payment.amount)}
+                                      </p>
+                                    </div>
+                                    <p className="mt-2 text-sm text-muted-foreground">
+                                      Recibido: {formatMoney(payment.receivedAmount)} · Propina:{' '}
+                                      {formatMoney(payment.tipAmount)} · Vuelto:{' '}
+                                      {formatMoney(payment.changeAmount)}
+                                    </p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                      {payment.payerName || 'Sin pagador'} ·{' '}
+                                      {payment.reference || 'Sin referencia'} ·{' '}
+                                      {payment.createdBy}
+                                    </p>
+                                    {payment.notes && (
+                                      <p className="mt-2 text-sm">{payment.notes}</p>
+                                    )}
+                                  </div>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
@@ -746,6 +1066,55 @@ export default function AdminOrders() {
               />
             </div>
 
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="order-discount-type">Descuento</Label>
+                <select
+                  id="order-discount-type"
+                  value={orderForm.discountType}
+                  onChange={(event) =>
+                    setOrderForm((current) => ({
+                      ...current,
+                      discountType: event.target.value as 'percentage' | 'fixed' | '',
+                    }))
+                  }
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">Sin descuento</option>
+                  <option value="percentage">Porcentaje</option>
+                  <option value="fixed">Monto fijo</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="order-discount-value">Valor</Label>
+                <Input
+                  id="order-discount-value"
+                  type="number"
+                  min="0"
+                  value={orderForm.discountValue}
+                  onChange={(event) =>
+                    setOrderForm((current) => ({
+                      ...current,
+                      discountValue: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="order-discount-reason">Motivo</Label>
+                <Input
+                  id="order-discount-reason"
+                  value={orderForm.discountReason}
+                  onChange={(event) =>
+                    setOrderForm((current) => ({
+                      ...current,
+                      discountReason: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
             <DialogFooter>
               <Button
                 type="button"
@@ -783,7 +1152,13 @@ export default function AdminOrders() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={deleteOrder.isPending || !orderToDelete}
-              onClick={() => orderToDelete && deleteOrder.mutate(orderToDelete.id)}
+              onClick={() =>
+                orderToDelete &&
+                deleteOrder.mutate({
+                  id: orderToDelete.id,
+                  reason: 'Anulado desde administracion.',
+                })
+              }
             >
               {deleteOrder.isPending ? 'Eliminando...' : 'Eliminar'}
             </AlertDialogAction>

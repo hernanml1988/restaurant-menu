@@ -22,6 +22,10 @@ export interface DashboardSummaryRecord {
   completedOrders: number;
   totalSalesToday: number;
   avgPrepTime: number;
+  stockAlerts: number;
+  todayReservations: number;
+  hasOpenCashSession: boolean;
+  discountsToday: number;
   topProducts: DashboardTopProductRecord[];
 }
 

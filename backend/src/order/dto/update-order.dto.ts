@@ -2,8 +2,10 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsNumber,
   IsOptional,
   IsString,
+  Min,
 } from 'class-validator';
 import {
   OrderPriorityEnum,
@@ -39,4 +41,17 @@ export class UpdateOrderDto {
   @IsOptional()
   @IsBoolean()
   state?: boolean;
+
+  @IsOptional()
+  @IsString()
+  discountType?: 'percentage' | 'fixed' | null;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discountValue?: number;
+
+  @IsOptional()
+  @IsString()
+  discountReason?: string | null;
 }

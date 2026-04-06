@@ -1,11 +1,27 @@
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Clock, MapPin } from 'lucide-react';
-import { RESTAURANT } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 
 export default function ClientConfirmation() {
   const navigate = useNavigate();
-  const { orderNumber } = useApp();
+  const { lastSubmittedOrder, session } = useApp();
+
+  if (!lastSubmittedOrder) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh] px-6 text-center">
+        <h1 className="font-display text-2xl mb-2">No hay pedido confirmado</h1>
+        <p className="text-sm text-muted-foreground mb-6">
+          Cuando envíes un pedido aparecerá aquí su confirmación.
+        </p>
+        <button
+          onClick={() => navigate('/cliente/menu')}
+          className="bg-primary text-primary-foreground font-medium px-6 py-3 rounded-xl"
+        >
+          Volver al menú
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] px-6 text-center">
@@ -21,11 +37,11 @@ export default function ClientConfirmation() {
       <div className="w-full max-w-xs space-y-3 animate-slide-up delay-200">
         <div className="bg-card border rounded-2xl p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-            #{orderNumber}
+            #{lastSubmittedOrder.number}
           </div>
           <div className="text-left">
             <p className="text-xs text-muted-foreground">Número de pedido</p>
-            <p className="font-semibold">Pedido #{orderNumber}</p>
+            <p className="font-semibold">Pedido #{lastSubmittedOrder.number}</p>
           </div>
         </div>
 
@@ -35,7 +51,7 @@ export default function ClientConfirmation() {
           </div>
           <div className="text-left">
             <p className="text-xs text-muted-foreground">Mesa asignada</p>
-            <p className="font-semibold">{RESTAURANT.currentTable}</p>
+            <p className="font-semibold">{session?.table?.name ?? 'No determinada'}</p>
           </div>
         </div>
 
@@ -44,8 +60,8 @@ export default function ClientConfirmation() {
             <Clock className="w-5 h-5 text-status-preparing" />
           </div>
           <div className="text-left">
-            <p className="text-xs text-muted-foreground">Tiempo estimado</p>
-            <p className="font-semibold">15 - 25 min</p>
+            <p className="text-xs text-muted-foreground">Estado inicial</p>
+            <p className="font-semibold capitalize">{lastSubmittedOrder.orderStatus}</p>
           </div>
         </div>
       </div>

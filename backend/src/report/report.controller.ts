@@ -1,11 +1,14 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { InternalRoles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 import { ReportRangeQueryDto } from './dto/report-range-query.dto';
 import { TopProductsQueryDto } from './dto/top-products-query.dto';
 import { ReportService } from './report.service';
 
 @Controller('report')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@InternalRoles('admin')
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}
 

@@ -2,6 +2,7 @@ import {
   IsArray,
   IsBoolean,
   IsNotEmpty,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -47,6 +48,20 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean()
   promo?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  trackStock?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  stockQuantity?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  stockAlertThreshold?: number;
 
   @IsOptional()
   @IsArray()

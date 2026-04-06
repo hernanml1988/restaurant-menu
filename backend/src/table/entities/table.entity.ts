@@ -10,6 +10,7 @@ import {
 import { StatusEnum } from '../../enums/status.enum';
 import { DiningSession } from '../../dining_session/entities/dining_session.entity';
 import { Order } from '../../order/entities/order.entity';
+import { Payment } from '../../payment/entities/payment.entity';
 import { Restaurant } from '../../restaurant/entities/restaurant.entity';
 import { ServiceRequest } from '../../service_request/entities/service_request.entity';
 
@@ -81,6 +82,9 @@ export class Table {
 
   @OneToMany(() => Order, (order) => order.table)
   orders: Order[];
+
+  @OneToMany(() => Payment, (payment) => payment.table)
+  payments: Payment[];
 
   @OneToMany(() => ServiceRequest, (serviceRequest) => serviceRequest.table)
   serviceRequests: ServiceRequest[];

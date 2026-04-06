@@ -1,63 +1,126 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Minus, Plus, ShoppingCart, AlertTriangle } from 'lucide-react';
-import { products } from '@/data/mockData';
-import { useApp } from '@/context/AppContext';
+import { useQuery } from '@tanstack/react-query';
+import { AlertTriangle, ArrowLeft, Minus, Plus, ShoppingCart } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useApp, type CartExtraSelection } from '@/context/AppContext';
+import { getPublicProductRequest } from '@/services/productService';
+
+const fallbackGradient = 'from-amber-100 to-orange-100';
 
 export default function ClientProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addToCart } = useApp();
-  const product = products.find(p => p.id === id);
-
+  const { addToCart, session } = useApp();
   const [quantity, setQuantity] = useState(1);
-  const [selectedExtras, setSelectedExtras] = useState<{ extraId: string; value: string }[]>([]);
+  const [selectedExtras, setSelectedExtras] = useState<CartExtraSelection[]>([]);
   const [notes, setNotes] = useState('');
 
-  if (!product) return <div className="p-6 text-center">Producto no encontrado</div>;
+  const productQuery = useQuery({
+    queryKey: ['client', 'products', id],
+    queryFn: () => getPublicProductRequest(id as string),
+    enabled: Boolean(id),
+  });
 
-  const toggleExtra = (extraId: string, value: string) => {
-    setSelectedExtras(prev => {
-      const existing = prev.find(e => e.extraId === extraId);
-      if (existing) {
-        if (existing.value === value) return prev.filter(e => e.extraId !== extraId);
-        return prev.map(e => e.extraId === extraId ? { ...e, value } : e);
+  const product = productQuery.data;
+
+  const extrasTotal = useMemo(
+    () => selectedExtras.reduce((sum, extra) => sum + extra.price, 0),
+    [selectedExtras],
+  );
+  const total = useMemo(
+    () => ((Number(product?.price) || 0) + extrasTotal) * quantity,
+    [extrasTotal, product?.price, quantity],
+  );
+
+  const toggleExtra = (
+    extraId: string,
+    name: string,
+    value: string,
+    price: number,
+  ) => {
+    setSelectedExtras((currentExtras) => {
+      const existingExtra = currentExtras.find((extra) => extra.extraId === extraId);
+
+      if (existingExtra) {
+        if (existingExtra.value === value) {
+          return currentExtras.filter((extra) => extra.extraId !== extraId);
+        }
+
+        return currentExtras.map((extra) =>
+          extra.extraId === extraId ? { extraId, name, value, price } : extra,
+        );
       }
-      return [...prev, { extraId, value }];
+
+      return [...currentExtras, { extraId, name, value, price }];
     });
   };
 
-  const extrasTotal = selectedExtras.reduce((s, e) => {
-    const extra = product.extras.find(x => x.id === e.extraId);
-    return s + (extra?.price || 0);
-  }, 0);
-
-  const total = (product.price + extrasTotal) * quantity;
-
   const handleAdd = () => {
+    if (!product) {
+      return;
+    }
+
     addToCart(product, quantity, selectedExtras, notes);
-    navigate('/cliente/menu');
+    navigate('/cliente/carrito');
   };
+
+  if (productQuery.isLoading) {
+    return <div className="p-6 text-center text-muted-foreground">Cargando producto...</div>;
+  }
+
+  if (productQuery.error || !product) {
+    return (
+      <div className="p-6">
+        <Alert className="border-destructive/30 bg-destructive/5">
+          <AlertTitle>Producto no disponible</AlertTitle>
+          <AlertDescription>
+            {productQuery.error instanceof Error
+              ? productQuery.error.message
+              : 'No se pudo obtener el producto.'}
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in">
-      {/* Image */}
-      <div className={`relative h-56 bg-gradient-to-br ${product.gradient} flex items-center justify-center`}>
-        <button onClick={() => navigate(-1)} className="absolute top-4 left-4 w-10 h-10 rounded-full bg-card/90 backdrop-blur flex items-center justify-center shadow-md active:scale-[0.95]">
+      <div
+        className={`relative h-56 bg-gradient-to-br ${product.gradient || fallbackGradient} flex items-center justify-center`}
+      >
+        <button
+          onClick={() => navigate(-1)}
+          className="absolute top-4 left-4 w-10 h-10 rounded-full bg-card/90 backdrop-blur flex items-center justify-center shadow-md active:scale-[0.95]"
+        >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <span className="text-8xl">{product.image}</span>
+        <span className="text-8xl">{product.image || product.name.slice(0, 1).toUpperCase()}</span>
       </div>
 
       <div className="px-5 py-5 -mt-4 bg-background rounded-t-3xl relative">
         {product.promo && (
-          <span className="inline-block bg-accent text-accent-foreground text-xs font-bold px-3 py-1 rounded-full mb-2">Promoción</span>
+          <span className="inline-block bg-accent text-accent-foreground text-xs font-bold px-3 py-1 rounded-full mb-2">
+            Promoción
+          </span>
         )}
         <h1 className="font-display text-2xl mb-1">{product.name}</h1>
-        <p className="font-display text-primary text-2xl mb-4">S/ {product.price}</p>
-        <p className="text-muted-foreground text-sm leading-relaxed mb-4">{product.description}</p>
+        <p className="font-display text-primary text-2xl mb-4">
+          ${Number(product.price).toFixed(2)}
+        </p>
+        <p className="text-muted-foreground text-sm leading-relaxed mb-4">
+          {product.description}
+        </p>
 
-        {/* Allergens */}
+        {!session && (
+          <Alert className="mb-5 border-status-pending/30 bg-status-pending/5">
+            <AlertTitle>Sesión requerida</AlertTitle>
+            <AlertDescription>
+              Necesitas una mesa activa para agregar productos al carrito.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {product.allergens.length > 0 && (
           <div className="flex items-start gap-2 bg-destructive/8 border border-destructive/15 rounded-xl p-3 mb-5">
             <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
@@ -68,66 +131,78 @@ export default function ClientProductDetail() {
           </div>
         )}
 
-        {/* Extras */}
         {product.extras.length > 0 && (
           <div className="mb-5">
             <h3 className="font-semibold text-sm mb-3">Personalizar</h3>
             <div className="space-y-2">
-              {product.extras.map(extra => (
-                <div key={extra.id}>
-                  {extra.type === 'choice' && extra.options ? (
-                    <div className="bg-muted rounded-xl p-3">
-                      <p className="text-sm font-medium mb-2">{extra.name}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {extra.options.map(opt => {
-                          const isSelected = selectedExtras.some(e => e.extraId === extra.id && e.value === opt);
-                          return (
-                            <button
-                              key={opt}
-                              onClick={() => toggleExtra(extra.id, opt)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-[0.96] ${
-                                isSelected
-                                  ? 'bg-primary text-primary-foreground'
-                                  : 'bg-card border text-foreground'
-                              }`}
-                            >
-                              {opt}
-                            </button>
-                          );
-                        })}
+              {product.extras
+                .filter((extra) => extra.state)
+                .map((extra) => (
+                  <div key={extra.id}>
+                    {extra.type === 'choice' && extra.options.length > 0 ? (
+                      <div className="bg-muted rounded-xl p-3">
+                        <p className="text-sm font-medium mb-2">{extra.name}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {extra.options.map((option) => {
+                            const isSelected = selectedExtras.some(
+                              (selectedExtra) =>
+                                selectedExtra.extraId === extra.id &&
+                                selectedExtra.value === option,
+                            );
+
+                            return (
+                              <button
+                                key={option}
+                                onClick={() =>
+                                  toggleExtra(extra.id, extra.name, option, Number(extra.price))
+                                }
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-[0.96] ${
+                                  isSelected
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-card border text-foreground'
+                                }`}
+                              >
+                                {option}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => toggleExtra(extra.id, extra.name)}
-                      className={`w-full flex items-center justify-between p-3 rounded-xl text-sm transition-all active:scale-[0.98] ${
-                        selectedExtras.some(e => e.extraId === extra.id)
-                          ? 'bg-primary/10 border-primary/30 border'
-                          : 'bg-muted'
-                      }`}
-                    >
-                      <span>{extra.name}</span>
-                      {extra.price > 0 && <span className="text-primary font-medium">+S/ {extra.price}</span>}
-                    </button>
-                  )}
-                </div>
-              ))}
+                    ) : (
+                      <button
+                        onClick={() =>
+                          toggleExtra(extra.id, extra.name, extra.name, Number(extra.price))
+                        }
+                        className={`w-full flex items-center justify-between p-3 rounded-xl text-sm transition-all active:scale-[0.98] ${
+                          selectedExtras.some((selectedExtra) => selectedExtra.extraId === extra.id)
+                            ? 'bg-primary/10 border-primary/30 border'
+                            : 'bg-muted'
+                        }`}
+                      >
+                        <span>{extra.name}</span>
+                        {Number(extra.price) > 0 && (
+                          <span className="text-primary font-medium">
+                            +${Number(extra.price).toFixed(2)}
+                          </span>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                ))}
             </div>
           </div>
         )}
 
-        {/* Notes */}
         <div className="mb-5">
           <h3 className="font-semibold text-sm mb-2">Notas especiales</h3>
           <textarea
             value={notes}
-            onChange={e => setNotes(e.target.value)}
+            onChange={(event) => setNotes(event.target.value)}
             placeholder="Ej: Sin sal, sin gluten, alergia a frutos secos..."
             className="w-full p-3 rounded-xl bg-muted text-sm placeholder:text-muted-foreground/50 resize-none h-20 focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
 
-        {/* Quantity */}
         <div className="flex items-center justify-between mb-6">
           <span className="font-semibold text-sm">Cantidad</span>
           <div className="flex items-center gap-4">
@@ -147,14 +222,13 @@ export default function ClientProductDetail() {
           </div>
         </div>
 
-        {/* Add button */}
         <button
           onClick={handleAdd}
-          disabled={!product.available}
+          disabled={!product.available || !session}
           className="w-full bg-primary text-primary-foreground font-semibold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-primary/25 hover:shadow-xl transition-all active:scale-[0.97] disabled:opacity-50"
         >
           <ShoppingCart className="w-5 h-5" />
-          Agregar · S/ {total.toFixed(2)}
+          Agregar · ${total.toFixed(2)}
         </button>
       </div>
     </div>

@@ -43,6 +43,11 @@ export interface OrderRecord {
   station: OrderStation;
   observations: string | null;
   total: number;
+  subtotalBeforeDiscount?: number;
+  discountAmount?: number;
+  discountType?: 'percentage' | 'fixed' | null;
+  discountValue?: number;
+  discountReason?: string | null;
   orderedAtLabel: string | null;
   estimatedReadyAt: string | null;
   deliveredAt: string | null;
@@ -73,6 +78,25 @@ export interface UpdateOrderPayload {
   estimatedReadyAt?: string | null;
   deliveredAt?: string | null;
   state?: boolean;
+  discountType?: 'percentage' | 'fixed' | null;
+  discountValue?: number;
+  discountReason?: string | null;
+}
+
+export interface CreatePublicOrderPayload {
+  sessionToken: string;
+  priority?: OrderPriority;
+  station?: OrderStation;
+  observations?: string;
+  items: Array<{
+    productId: string;
+    quantity: number;
+    notes?: string;
+    extras?: Array<{
+      productExtraId: string;
+      value: string;
+    }>;
+  }>;
 }
 
 async function parseResponseBody<T>(response: Response) {
@@ -108,8 +132,22 @@ export async function getOrdersRequest() {
   return requestOrderApi<OrderRecord[]>('/order', { method: 'GET' });
 }
 
+export async function getKitchenBoardOrdersRequest() {
+  return requestOrderApi<OrderRecord[]>('/order/kitchen/board', {
+    method: 'GET',
+  });
+}
+
 export async function getOrderRequest(orderId: string) {
   return requestOrderApi<OrderRecord>(`/order/${orderId}`, { method: 'GET' });
+}
+
+export async function createPublicOrderRequest(payload: CreatePublicOrderPayload) {
+  return requestOrderApi<OrderRecord>('/order/public', {
+    method: 'POST',
+    credentials: 'omit',
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function updateOrderRequest(
@@ -122,8 +160,9 @@ export async function updateOrderRequest(
   });
 }
 
-export async function deactivateOrderRequest(orderId: string) {
+export async function deactivateOrderRequest(orderId: string, reason?: string) {
   return requestOrderApi<OrderRecord>(`/order/${orderId}`, {
     method: 'DELETE',
+    body: JSON.stringify(reason ? { reason } : {}),
   });
 }

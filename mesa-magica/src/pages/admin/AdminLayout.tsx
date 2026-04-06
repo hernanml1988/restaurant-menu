@@ -6,6 +6,8 @@ import {
   ClipboardList,
   Users,
   BarChart3,
+  CalendarDays,
+  Wallet,
   ArrowLeft,
   Building2,
   LogOut,
@@ -22,6 +24,8 @@ const navItems = [
   { to: '/admin/pedidos', icon: ClipboardList, label: 'Pedidos' },
   { to: '/admin/usuarios', icon: Users, label: 'Usuarios' },
   { to: '/admin/reportes', icon: BarChart3, label: 'Reportes' },
+  { to: '/admin/reservas', icon: CalendarDays, label: 'Reservas' },
+  { to: '/admin/operaciones', icon: Wallet, label: 'Operaciones' },
   { to: '/admin/mis-datos', icon: Building2, label: 'Mis Datos' },
 ];
 

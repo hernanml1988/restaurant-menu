@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Product } from '../product/entities/product.entity';
+import { RestaurantService } from '../restaurant/restaurant.service';
 import { Restaurant } from '../restaurant/entities/restaurant.entity';
 import Utils from '../utils/errorUtils';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -21,6 +22,7 @@ export class CategoryService {
     private readonly restaurantRepository: Repository<Restaurant>,
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
+    private readonly restaurantService: RestaurantService,
   ) {}
 
   private async resolveRestaurant(restaurantId: string) {
@@ -49,6 +51,35 @@ export class CategoryService {
   private async attachCount(category: Category) {
     category.count = await this.getActiveProductCount(category.id);
     return category;
+  }
+
+  async findPublicAll() {
+    try {
+      const restaurant = await this.restaurantService.getCurrentRestaurantEntity();
+      const categories = await this.categoryRepository.find({
+        where: {
+          restaurant: { id: restaurant.id },
+          state: true,
+        },
+        relations: {
+          restaurant: true,
+        },
+        order: {
+          name: 'ASC',
+        },
+      });
+
+      const categoriesWithCount = await Promise.all(
+        categories.map((category) => this.attachCount(category)),
+      );
+
+      return {
+        message: 'Categorias publicas obtenidas exitosamente',
+        data: categoriesWithCount,
+      };
+    } catch (error) {
+      Utils.errorResponse(error);
+    }
   }
 
   async create(createCategoryDto: CreateCategoryDto) {

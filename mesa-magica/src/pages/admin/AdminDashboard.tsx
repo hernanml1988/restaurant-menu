@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowUpRight,
   Clock,
@@ -7,6 +7,8 @@ import {
   Users,
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import { createInternalRealtimeSource } from '@/services/realtimeService';
 import { getDashboardSummaryRequest } from '@/services/dashboardService';
 
 function formatCurrency(value: number) {
@@ -18,9 +20,18 @@ function formatCurrency(value: number) {
 }
 
 export default function AdminDashboard() {
+  const queryClient = useQueryClient();
   const dashboardQuery = useQuery({
     queryKey: ['admin', 'dashboard', 'summary'],
     queryFn: getDashboardSummaryRequest,
+  });
+
+  useRealtimeSubscription(createInternalRealtimeSource, ({ event }) => {
+    if (event.startsWith('order.')) {
+      void queryClient.invalidateQueries({
+        queryKey: ['admin', 'dashboard', 'summary'],
+      });
+    }
   });
 
   const dashboard = dashboardQuery.data;
@@ -56,6 +67,20 @@ export default function AdminDashboard() {
       change: 'Promedio del rango actual',
       color: 'bg-status-preparing/10 text-status-preparing',
     },
+    {
+      label: 'Alertas de stock',
+      value: String(dashboard?.stockAlerts ?? 0),
+      icon: TrendingUp,
+      change: `${dashboard?.todayReservations ?? 0} reservas en el rango`,
+      color: 'bg-destructive/10 text-destructive',
+    },
+    {
+      label: 'Caja activa',
+      value: dashboard?.hasOpenCashSession ? 'Abierta' : 'Cerrada',
+      icon: DollarSign,
+      change: formatCurrency(dashboard?.discountsToday ?? 0),
+      color: 'bg-primary/10 text-primary',
+    },
   ];
 
   return (
@@ -79,7 +104,7 @@ export default function AdminDashboard() {
         </Alert>
       )}
 
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {kpis.map((kpi, index) => (
           <div
             key={kpi.label}

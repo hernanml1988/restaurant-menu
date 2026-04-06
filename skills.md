@@ -11,9 +11,9 @@
   Backend: `main` para bootstrap, `app.module` para composicion, modulos de dominio (`user`, `role`, `profile`, `profile_role`, `auth`), `entities`, `dto`, `utils`, `config`.
 - Nivel de modularizacion:
   Frontend: Medio. La separacion por vistas es clara, pero el estado y los datos siguen centralizados y locales.
-  Backend: Medio. La estructura modular existe, pero varios modulos CRUD estan en estado scaffold y no completan su capa de negocio.
-- Integracion entre frontend y backend: No determinada como implementacion activa. El frontend actual consume datos mock locales y no realiza llamadas HTTP al backend.
-- Infraestructura detectada: no hay dockerizacion activa en el repositorio. El desarrollo local se resuelve con ejecucion directa de `backend` y `mesa-magica` mediante Node.js, y la base PostgreSQL debe estar disponible fuera del repo o instalada localmente.
+  Backend: Medio a alto. La estructura modular existe y el dominio operativo principal del restaurante ya esta implementado en multiples modulos.
+- Integracion entre frontend y backend: Activa. El frontend consume endpoints HTTP reales del backend mediante una capa `services`, usa `credentials: 'include'` para sesion interna por cookies y resuelve actualizacion operativa con `react-query` y SSE.
+- Infraestructura detectada: existe soporte dual. El desarrollo local principal sigue resolviendose con ejecucion directa de `backend` y `mesa-magica` mediante Node.js, pero el repositorio tambien incluye `docker-compose.yml`, `Dockerfile` por aplicacion y configuracion `nginx` para despliegue del frontend como SPA.
 
 ## 2. Lineamientos Frontend
 - Framework: React 18 + TypeScript + Vite.
@@ -27,22 +27,22 @@
 - Manejo de estado:
   Existe un contexto global `AppContext` para carrito y estado de pedido.
   El estado de interfaz se maneja principalmente con `useState`.
-  `react-query` esta configurado en `App.tsx`, pero no se detecto uso real de `useQuery` o `useMutation`.
+  `react-query` esta configurado en `App.tsx` y se usa activamente con `useQuery` y `useMutation` en vistas administrativas, cocina, cliente y configuracion transversal.
 - Fuente de datos actual:
-  Los datos operativos provienen de `src/data/mockData.ts`.
-  El frontend debe considerarse actualmente como prototipo/demo funcional desacoplado del backend real.
+  Conviven datos mock heredados con integraciones reales.
+  El frontend administrativo e interno ya consume backend real para autenticacion, mesas, menu, pedidos, cobro, reportes, reservas y operacion.
 - Convenciones de nombres:
   Componentes y paginas en PascalCase.
   Hooks con prefijo `use`.
   Alias `@` apuntando a `src`.
   Rutas organizadas por dominio funcional y no por feature package avanzada.
 - Consumo de APIs:
-  No determinado como patron activo en el frontend actual.
-  No se detectaron clientes HTTP, `fetch`, `axios` ni wrappers de servicios.
+  Patron activo mediante `fetch` encapsulado en `src/services`.
+  Se detectan servicios dedicados por dominio, por ejemplo autenticacion, restaurant, category, product, table, order, dining session, payment, report, realtime, reservation, cash session, receipt, fiscal document y audit log.
 - Manejo de errores:
-  No existe una estrategia transversal de errores de red porque no hay integracion activa.
+  La integracion de red existe y los servicios frontend convierten respuestas no exitosas en `Error`.
   Los errores de contexto se manejan con `throw new Error` en hooks como `useApp`.
-  La UX se apoya en `Toaster` y `Sonner`, aunque no se detecto un flujo centralizado de errores.
+  La UX se apoya en `Toaster` y `Sonner`, con manejo de errores localizado por vista y mutation.
 - Reglas de diseno detectadas:
   Uso consistente de Tailwind con variables CSS semanticas.
   Tipografia principal `DM Sans` y tipografia de display `DM Serif Display`.
@@ -67,7 +67,7 @@
   Cada modulo de dominio contiene `controller`, `service`, `dto` y `entities` cuando aplica.
   No se detecto capa repository personalizada ni casos de uso/application layer.
 - Modulos detectados:
-  `auth`, `user`, `role`, `profile`, `profile_role`.
+  `auth`, `user`, `role`, `profile`, `profile_role`, `restaurant`, `table`, `category`, `product`, `dining_session`, `order`, `service_request`, `payment`, `report`, `realtime`, `audit_log`, `cash_session`, `receipt`, `reservation`, `fiscal_document`.
 - Modelado de datos:
   Entidades TypeORM decoradas en clases.
   Uso de `uuid` como PK en las entidades revisadas.
@@ -82,13 +82,15 @@
   `cookie-parser` habilitado.
   Autenticacion JWT con cookies `jwt` y `refresh_token`.
   Hash de password con `bcrypt`.
-  Observacion tecnica: la clave JWT esta hardcodeada como `secretKey` en modulo y estrategia; no proviene de configuracion externa.
+  La clave JWT debe resolverse desde configuracion/env.
+  Los endpoints internos administrativos y operativos deben combinar autenticacion por cookie JWT y autorizacion explicita por rol interno en backend, sin depender solo de restricciones del frontend.
 - Manejo de errores:
   Se usa una utilidad `Utils.errorResponse(error)` que relanza `HttpException`.
   El patron no es uniforme en todos los servicios/controladores.
   Existen `try/catch` locales y respuestas manuales con `res.status(...).send(...)`.
 - Logs:
-  No se detecto estrategia de logging estructurado ni servicio de logs dedicado.
+  Existe logging puntual con `Logger` de Nest en flujos criticos como QR y sesion.
+  Existe modulo dedicado de auditoria operativa (`audit_log`) para registrar acciones sensibles.
 - Principios SOLID aplicados:
   S: Parcial. Hay separacion controller/service, pero algunas responsabilidades de respuesta HTTP y autenticacion siguen acopladas.
   O: Parcial.
@@ -96,9 +98,9 @@
   I: No determinado.
   D: Bajo a medio. La aplicacion depende directamente de repositorios TypeORM y configuraciones concretas.
 - Estado funcional real del backend:
-  `auth` y `user` contienen logica funcional parcial.
-  `role`, `profile` y `profile_role` conservan mayormente endpoints scaffold con respuestas placeholder.
-  `user/init-data` ejecuta una carga inicial acoplada y con credenciales embebidas en codigo.
+  El dominio operativo del restaurante esta implementado en backend y conectado con el frontend.
+  Existen flujos activos para QR, sesion de mesa, pedidos, solicitudes de servicio, cobro, caja, comprobantes, reservas, documentos fiscales internos y reportes.
+  `role`, `profile` y `profile_role` siguen siendo modulos de soporte interno con menor madurez funcional que el dominio operativo.
 - Restricciones operativas para futuras modificaciones en backend:
   Mantener el patron modular NestJS existente.
   No introducir capa repository personalizada, CQRS, hexagonal u otro patron mayor sin acuerdo explicito.
@@ -113,8 +115,8 @@
 - Configuracion: Variables de entorno cargadas por `ConfigModule`, con `TypeOrmModule.forRootAsync`.
 - Estrategia de persistencia:
   Persistencia directa desde servicios usando `repository.save()` y `findOne()`.
-  No se detectaron migraciones.
-  La sincronizacion automatica esta habilitada con `synchronize: true`.
+  Existen migraciones versionadas bajo `backend/src/database/migrations`.
+  La sincronizacion automatica no debe considerarse estrategia base; la evolucion de esquema debe resolverse con migraciones.
 - Modelo detectado:
   `User` relacionado uno a uno con `Profile`.
   `ProfileRole` funciona como entidad de union entre `Profile` y `Role`.
@@ -128,9 +130,8 @@
   Uso transversal del enum `StatusEnum` para estado logico.
   Persistencia de timestamps y campos de auditoria desde hooks de entidad.
 - Limitaciones actuales:
-  No se detectaron migraciones versionadas.
   No se detectaron indices adicionales, constraints complejos ni configuraciones avanzadas de relaciones.
-  El nombre de base configurado es `calendar`, lo que no coincide semanticamente con el dominio del restaurante.
+  El backend sigue usando persistencia directa con TypeORM sin una capa application separada.
 
 ## 5. Estilo de Desarrollo del Proyecto
 - Nivel de formalidad: Medio. La estructura de carpetas y stack estan bien definidos, pero existen areas scaffold y decisiones aun no consolidadas.
@@ -164,6 +165,7 @@
 - Consultar siempre este archivo antes de realizar cambios.
 - No romper la separacion actual entre `mesa-magica` y `backend`.
 - No asumir que frontend y backend ya estan integrados; validar primero la existencia de contrato real.
+- Asumir como estado actual que el frontend administrativo e interno ya esta integrado con el backend real mediante `src/services`, `react-query` y SSE, salvo que un modulo puntual indique explicitamente lo contrario.
 - No reemplazar datos mock por llamadas reales de forma dispersa. Si se da ese paso, crear una capa de servicios/API.
 - No introducir nuevas librerias de estado global, UI o networking sin necesidad tecnica clara.
 - Mantener las convenciones actuales:
@@ -179,10 +181,12 @@
 - Antes de aplicar una mejora arquitectonica relevante, proponerla tecnicamente y luego ejecutarla solo si corresponde al pedido.
 - Si se trabaja autenticacion o seguridad, priorizar:
   externalizar secretos,
-  eliminar credenciales hardcodeadas,
+  mantener secretos fuera del codigo,
+  reforzar autorizacion por rol en backend,
   formalizar DTOs,
   unificar manejo de errores.
 - Si se trabaja base de datos en backend, evitar seguir profundizando `synchronize: true` como estrategia de largo plazo sin plantear migraciones.
+  Priorizar migraciones versionadas y compatibles con PostgreSQL.
 - Si se modifica UI, conservar la identidad visual actual:
   tipografia DM Sans / DM Serif Display,
   variables CSS semanticas,
@@ -207,6 +211,9 @@
 - Patron backend registrado: cuando se implemente persistencia para el flujo operativo del frontend, las relaciones base deben preservar esta jerarquia funcional: `Restaurant` como agregado principal; `Table`, `Category`, `Product`, `DiningSession`, `Order` y `ServiceRequest` como entidades de operacion; `OrderItem`, `ProductExtra` y `OrderItemExtraSelection` como detalle transaccional dependiente.
 - Patron backend registrado: el acceso del cliente a la mesa debe resolverse mediante `Table.qrCode` generado automaticamente como identificador publico de escaneo; el QR abre el contexto de mesa y desde ahi el frontend o cliente debe consumir endpoints publicos para recuperar la mesa e iniciar o reutilizar una `DiningSession`.
 - Patron backend registrado: cuando el QR de mesa deba dirigir al frontend, `Table.qrCode` debe persistir una URL publica completa construida desde `FRONTEND_PUBLIC_URL` del `.env` backend, apuntando a una ruta cliente real del frontend y llevando el token de mesa en query string para que la experiencia de escaneo sea util desde celular sin hardcodes por ambiente.
+- Patron backend registrado: la resolucion publica de mesas por QR debe normalizar y decodificar el token recibido antes de compararlo, para tolerar links o tokens re-encodados por scanners, navegadores o copias manuales sin romper el acceso de la mesa.
+- Patron backend registrado: la resolucion publica de mesas por QR debe aceptar como entrada tanto la URL publica completa como el token crudo `table:...`, porque el cliente puede reenviar cualquiera de los dos formatos segun el punto de origen del link o del escaneo.
+- Patron backend registrado: cuando se investiguen flujos publicos criticos como QR o apertura de sesion, la trazabilidad temporal debe implementarse con `Logger` de Nest en los servicios involucrados, registrando payload de entrada, ids o tokens normalizados, resultado de resolucion y excepciones en `catch`, evitando `console.log` disperso.
 - Patron backend registrado: la cuenta del cliente se debe modelar sobre `DiningSession` y no solamente sobre `Table`; una mesa puede tener multiples sesiones activas en paralelo para soportar cuentas separadas, y todos los pedidos o extras de una misma cuenta deben vincularse al mismo `sessionToken`.
 - Patron backend registrado: los pedidos publicos del cliente deben crearse como nuevas filas de `Order` asociadas a una `DiningSession` existente; los extras posteriores no deben reescribir el pedido original, sino agregarse como nuevos pedidos o items dentro de la misma sesion para conservar una sola cuenta agregada.
 - Patron backend registrado: en modo single-tenant, el dominio `Restaurant` sigue siendo la raiz del modelo pero su resolucion no debe recaer en el frontend administrativo; el backend debe poder obtener o bootstrapear el restaurante actual y exponer recursos `current` para lectura publica y administracion protegida.
@@ -217,6 +224,26 @@
 - Excepcion tecnica registrada: los endpoints publicos orientados a cliente final para flujo de escaneo QR, apertura o consulta de `DiningSession` y creacion de pedidos sobre una sesion vigente pueden exponerse sin guard JWT, siempre que queden aislados del dominio administrativo interno y operen sobre tokens publicos de mesa o sesion.
 - Patron de infraestructura local registrado: el entorno de desarrollo vigente no debe depender de Docker. `backend` y `mesa-magica` deben ejecutarse localmente con sus scripts `npm`, manteniendo la configuracion sensible en archivos `.env` y dejando PostgreSQL como dependencia externa al repositorio.
 - Patron de infraestructura complementaria registrado: si se agrega Docker, debe implementarse como via opcional y no como reemplazo obligatorio del flujo local con `npm`; la orquestacion debe vivir en la raiz del monorepo, preservar la separacion `backend` y `mesa-magica`, y resolver dependencias locales de desarrollo mediante volumenes y servicios dedicados sin alterar los `.env` usados fuera de contenedores.
+- Patron de infraestructura complementaria registrado: en Windows, el `docker-compose.yml` base debe priorizar ejecucion estable sin bind mounts ni file watching dentro de `backend` y `mesa-magica`, porque `ts-node-dev` y `vite` sobre volumenes montados pueden fallar con errores `EIO`; si se necesita hot reload en contenedor, debe resolverse como variante explicita y no como modo por defecto.
+- Patron frontend/infrastructura registrado: cuando `mesa-magica` se publique en Docker detras de `nginx`, la imagen de produccion debe incluir una configuracion de SPA fallback con `try_files $uri $uri/ /index.html;` para que rutas cliente como `/cliente/bienvenida` o `/admin/...` no respondan `404` al refrescar o abrir enlaces directos.
 - Patron backend registrado: en CRUD administrativos del dominio operativo, la eliminacion debe resolverse como borrado logico mediante `state = false`, y cuando el recurso tenga dependencias activas directas relevantes para la consistencia funcional, el backend debe bloquear la eliminacion con error explicito antes de desactivar el registro.
 - Patron backend registrado: los endpoints administrativos de analitica y reportes deben exponerse en un modulo dedicado protegido con cookie JWT, resolver el restaurante actual en backend y aceptar filtros de rango por `startDate` y `endDate` o `days` para evitar logica temporal dispersa en frontend.
 - Patron backend registrado: cuando el dashboard administrativo necesite KPIs operativos y rankings resumidos, esos datos deben exponerse desde el mismo modulo de reportes mediante endpoints agregados de resumen, reutilizando filtros de rango y evitando que el frontend reconstruya metricas a partir de multiples endpoints dispersos.
+- Patron backend/frontend registrado: cuando una vista operativa interna como cocina necesite solo un subconjunto accionable del dominio, debe consumirse desde un endpoint dedicado de proyeccion operativa, por ejemplo `/order/kitchen/board`, filtrado en backend por estacion, estados y vigencia del registro, para evitar trasladar al frontend listados administrativos completos y filtrado disperso.
+- Patron frontend registrado: la experiencia publica de cliente debe centralizar en `AppContext` la sesion activa de mesa, el carrito y el ultimo pedido enviado, con persistencia en `localStorage`, para que bienvenida, menu, carrito, confirmacion, seguimiento y ayuda compartan el mismo estado sin duplicar almacenamiento por pagina.
+- Patron backend/frontend registrado: el catalogo publico orientado a cliente debe exponerse desde los modulos de dominio existentes mediante endpoints `public` sin JWT, resolviendo siempre el restaurante actual en backend y limitando la respuesta a registros activos para evitar que el frontend dependa de ids administrativos o reconstruya el contexto single-tenant.
+- Patron backend/frontend registrado: cuando la operacion necesite reflejo inmediato entre cliente, cocina y administracion, la notificacion en tiempo real debe resolverse mediante SSE sobre endpoints dedicados, reutilizando cookies JWT para canales internos y tokens publicos de sesion para canales del cliente, mientras los datos completos siguen leyendose desde servicios HTTP normales e invalidacion de `react-query`.
+- Patron frontend registrado: cuando una accion publica del cliente dependa del estado operativo de la sesion, como solicitar la cuenta, la vista debe validar primero la `DiningSession` vigente desde la capa `services` con `react-query` y bloquear la accion con feedback explicito hasta que se cumpla la regla de negocio, evitando confiar solo en estado local persistido.
+- Patron backend/frontend registrado: el flujo de cobro y cierre debe modelarse sobre `DiningSession` mediante una entidad `Payment` separada, permitiendo multiples pagos parciales por sesion, propina y vuelto por transaccion, dejando el cierre como accion explicita posterior al saldo cero y auditando cada accion interna con el usuario autenticado.
+- Patron backend registrado: toda autorizacion interna nueva debe resolverse en backend combinando `AuthGuard('jwt')` con guard de roles y metadata explicita por endpoint, evitando confiar solo en `ProtectedRoute` del frontend.
+- Patron backend registrado: la numeracion operativa sensible, como correlativos de pedido o folios internos, debe persistirse mediante tablas de secuencia dedicadas y bloqueo transaccional, evitando `MAX + 1` bajo concurrencia.
+- Patron backend registrado: toda accion sensible de operacion interna, como cobro, cancelacion, apertura/cierre de caja, cierre o reapertura de cuenta, descuento o anulacion, debe dejar registro en `audit_log`.
+- Patron backend registrado: las nuevas capacidades operativas transversales, como caja, comprobantes, reservas o fiscalizacion documental interna, deben implementarse como modulos NestJS independientes con `entity/controller/service/dto` y no incrustarse en `order` o `payment`.
+- Patron backend registrado: la evolucion de esquema debe materializarse en migraciones TypeORM bajo `backend/src/database/migrations`, y la configuracion de TypeORM debe preferir `migrationsRun` antes que `synchronize`.
+- Patron backend registrado: cuando el sistema requiera SSE mas resiliente que memoria local, los eventos deben persistirse en base de datos y el stream debe poder reconstruirse desde `last-event-id`, para tolerar reconexiones y despliegues con multiples instancias.
+- Patron backend/frontend registrado: el control de stock de productos debe ser opt-in por producto (`trackStock`), mantener cantidad disponible y umbral de alerta, descontarse al crear pedidos reales y restaurarse si el pedido se anula.
+- Patron backend/frontend registrado: descuentos administrativos sobre pedidos deben modelarse sobre `Order` con `subtotalBeforeDiscount`, `discountType`, `discountValue`, `discountAmount` y `discountReason`, de modo que reportes, cobro y auditoria compartan la misma fuente de verdad.
+- Patron backend/frontend registrado: los comprobantes imprimibles deben generarse desde backend como snapshot persistido con HTML imprimible y exponerlo al frontend solo para visualizacion o impresion, evitando reconstruir el comprobante desde estado parcial de UI.
+- Patron backend/frontend registrado: la caja diaria debe modelarse mediante `CashSession` con apertura, esperado, cierre, diferencia y responsables, y el frontend administrativo debe operar sobre ese recurso dedicado en lugar de derivar caja desde reportes sueltos.
+- Patron backend/frontend registrado: las reservas deben tratarse como modulo administrativo propio con estado, fecha/hora, party size y mesa opcional, sin mezclar su ciclo de vida con `DiningSession` hasta que el negocio defina una transicion explicita a mesa atendida.
+- Patron backend/frontend registrado: la fiscalizacion documental interna debe implementarse como modulo de documentos persistidos asociado a `DiningSession`, `Payment` y `Receipt`, dejando las integraciones tributarias externas como una capa posterior y no embebida de forma rigida en la UI.

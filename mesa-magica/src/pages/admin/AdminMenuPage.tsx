@@ -53,6 +53,9 @@ type ProductForm = {
   available: boolean;
   popular: boolean;
   promo: boolean;
+  trackStock: boolean;
+  stockQuantity: string;
+  stockAlertThreshold: string;
 };
 
 const emptyCategoryForm: CategoryForm = { name: '', emoji: '' };
@@ -67,6 +70,9 @@ const emptyProductForm: ProductForm = {
   available: true,
   popular: false,
   promo: false,
+  trackStock: false,
+  stockQuantity: '0',
+  stockAlertThreshold: '0',
 };
 const fallbackGradient = 'from-amber-100 to-orange-100';
 
@@ -254,6 +260,9 @@ export default function AdminMenuPage() {
       available: product.available,
       popular: product.popular,
       promo: product.promo,
+      trackStock: product.trackStock,
+      stockQuantity: String(product.stockQuantity),
+      stockAlertThreshold: String(product.stockAlertThreshold),
     });
     setProductDialogOpen(true);
   };
@@ -307,6 +316,9 @@ export default function AdminMenuPage() {
       available: productForm.available,
       popular: productForm.popular,
       promo: productForm.promo,
+      trackStock: productForm.trackStock,
+      stockQuantity: Number(productForm.stockQuantity || 0),
+      stockAlertThreshold: Number(productForm.stockAlertThreshold || 0),
       allergens: productForm.allergens
         .split(',')
         .map((value) => value.trim())
@@ -415,6 +427,7 @@ export default function AdminMenuPage() {
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Producto</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Categoria</th>
                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">Precio</th>
+                <th className="px-4 py-3 text-center font-medium text-muted-foreground">Stock</th>
                 <th className="px-4 py-3 text-center font-medium text-muted-foreground">Extras</th>
                 <th className="px-4 py-3 text-center font-medium text-muted-foreground">Estado</th>
                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">Acciones</th>
@@ -423,7 +436,7 @@ export default function AdminMenuPage() {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
                     Cargando productos...
                   </td>
                 </tr>
@@ -461,6 +474,18 @@ export default function AdminMenuPage() {
                       ${Number(product.price).toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-center">
+                      {product.trackStock ? (
+                        <div className="text-xs">
+                          <p className="font-medium">{product.stockQuantity}</p>
+                          <p className="text-muted-foreground">
+                            alerta {product.stockAlertThreshold}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Libre</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
                       {product.extras.length ? (
                         <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-xs">
                           <Tag className="h-3 w-3" /> {product.extras.length}
@@ -494,7 +519,7 @@ export default function AdminMenuPage() {
                 ))}
               {!loading && !filteredProducts.length && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
                     No hay productos para el filtro actual.
                   </td>
                 </tr>
@@ -632,6 +657,20 @@ export default function AdminMenuPage() {
                 <input type="checkbox" checked={productForm.promo} onChange={(e) => setProductForm((current) => ({ ...current, promo: e.target.checked }))} />
                 Promo
               </label>
+              <label className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm">
+                <input type="checkbox" checked={productForm.trackStock} onChange={(e) => setProductForm((current) => ({ ...current, trackStock: e.target.checked }))} />
+                Controlar stock
+              </label>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="product-stock-quantity">Stock</Label>
+                <Input id="product-stock-quantity" type="number" min={0} value={productForm.stockQuantity} onChange={(e) => setProductForm((current) => ({ ...current, stockQuantity: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="product-stock-alert-threshold">Alerta de stock</Label>
+                <Input id="product-stock-alert-threshold" type="number" min={0} value={productForm.stockAlertThreshold} onChange={(e) => setProductForm((current) => ({ ...current, stockAlertThreshold: e.target.value }))} />
+              </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setProductDialogOpen(false)} disabled={createProduct.isPending || updateProduct.isPending}>Cancelar</Button>
