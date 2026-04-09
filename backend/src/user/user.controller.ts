@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -19,13 +20,35 @@ import { UserService } from './user.service';
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
+  private isPublicBootstrapEnabled() {
+    const explicitFlag = process.env.ALLOW_PUBLIC_BOOTSTRAP;
+    if (explicitFlag !== undefined) {
+      return explicitFlag === 'true';
+    }
+
+    const nodeEnv = (process.env.NODE_ENV || 'development').toLowerCase();
+    return nodeEnv === 'development' || nodeEnv === 'test';
+  }
+
+  private assertPublicBootstrapEnabled() {
+    if (this.isPublicBootstrapEnabled()) {
+      return;
+    }
+
+    throw new ForbiddenException(
+      'Public bootstrap endpoints are disabled in this environment.',
+    );
+  }
+
   @Post('init-data')
   initService() {
+    this.assertPublicBootstrapEnabled();
     return this.userService.initService();
   }
 
   @Post('public-create')
   createPublic(@Body() createUserDto: CreateUserDto) {
+    this.assertPublicBootstrapEnabled();
     return this.userService.createPublic(createUserDto);
   }
 

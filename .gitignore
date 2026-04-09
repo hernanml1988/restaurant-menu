@@ -2,3 +2,9 @@
 .env.*
 *.env
 *.md
+!QA_E2E_CHECKLIST.md
+!backend/README.md
+!mesa-magica/README.md
+!backend/docs/
+!backend/docs/curl/
+!backend/docs/curl/*.md

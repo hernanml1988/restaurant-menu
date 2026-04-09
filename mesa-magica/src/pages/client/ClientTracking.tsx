@@ -11,14 +11,19 @@ import { createSessionRealtimeSource } from '@/services/realtimeService';
 
 const steps = [
   { id: 'received', label: 'Recibido', sublabel: 'Tu pedido fue registrado', icon: Check },
-  { id: 'preparing', label: 'En preparaciÃ³n', sublabel: 'La cocina estÃ¡ trabajando en tu pedido', icon: ChefHat },
-  { id: 'ready', label: 'Listo', sublabel: 'Tu pedido estÃ¡ listo para servir', icon: Package },
-  { id: 'delivered', label: 'Entregado', sublabel: 'Â¡Buen provecho!', icon: Bell },
+  {
+    id: 'preparing',
+    label: 'En preparacion',
+    sublabel: 'La cocina esta trabajando en tu pedido',
+    icon: ChefHat,
+  },
+  { id: 'ready', label: 'Listo', sublabel: 'Tu pedido esta listo para servir', icon: Package },
+  { id: 'delivered', label: 'Entregado', sublabel: 'Buen provecho', icon: Bell },
 ] as const;
 
 const statusLabels: Record<OrderRecord['orderStatus'], string> = {
   received: 'Recibido',
-  preparing: 'En preparaciÃ³n',
+  preparing: 'En preparacion',
   ready: 'Listo',
   delivered: 'Entregado',
 };
@@ -66,14 +71,11 @@ export default function ClientTracking() {
     enabled: Boolean(session?.sessionToken),
   });
 
-  useRealtimeSubscription(
-    sessionRealtimeSource,
-    ({ event }) => {
-      if (event.startsWith('order.')) {
-        void sessionQuery.refetch();
-      }
-    },
-  );
+  useRealtimeSubscription(sessionRealtimeSource, ({ event }) => {
+    if (event.startsWith('order.')) {
+      void sessionQuery.refetch();
+    }
+  });
 
   const orders = useMemo(() => {
     const currentOrders = sessionQuery.data?.orders ?? [];
@@ -100,7 +102,7 @@ export default function ClientTracking() {
     return (
       <div className="p-6">
         <Alert>
-          <AlertTitle>SesiÃ³n no disponible</AlertTitle>
+          <AlertTitle>Sesion no disponible</AlertTitle>
           <AlertDescription>
             Escanea el QR de tu mesa para consultar el seguimiento del pedido.
           </AlertDescription>
@@ -113,13 +115,13 @@ export default function ClientTracking() {
     <div className="px-5 pt-5 animate-fade-in">
       <h1 className="font-display text-2xl mb-1">Seguimiento</h1>
       <p className="text-sm text-muted-foreground mb-6">
-        {session.table?.name ?? 'Mesa no determinada'} Â·{' '}
+        {session.table?.name ?? 'Mesa no determinada'} -{' '}
         {currentOrder ? `Pedido #${currentOrder.number}` : 'Sin pedidos activos'}
       </p>
 
       {sessionQuery.error && (
         <Alert className="mb-6 border-destructive/30 bg-destructive/5">
-          <AlertTitle>No se pudo consultar la sesiÃ³n</AlertTitle>
+          <AlertTitle>No se pudo consultar la sesion</AlertTitle>
           <AlertDescription>
             {sessionQuery.error instanceof Error
               ? sessionQuery.error.message
@@ -130,7 +132,7 @@ export default function ClientTracking() {
 
       {!currentOrder ? (
         <div className="bg-card border rounded-2xl p-6 text-center text-muted-foreground">
-          AÃºn no hay pedidos registrados en esta sesiÃ³n.
+          Aun no hay pedidos registrados en esta sesion.
         </div>
       ) : (
         <>
@@ -222,7 +224,7 @@ export default function ClientTracking() {
                 <p className="text-sm font-medium">Pedido #{order.number}</p>
                 <p className="text-xs text-muted-foreground">
                   {(order.orderedAtLabel || formatTime(order.createdAt) || 'Hora no determinada')}{' '}
-                  Â· {statusLabels[order.orderStatus]}
+                  - {statusLabels[order.orderStatus]}
                 </p>
               </div>
               <span className="font-display text-sm text-primary">
@@ -233,7 +235,7 @@ export default function ClientTracking() {
 
           {!orders.length && (
             <div className="bg-card border rounded-xl p-3 text-sm text-muted-foreground">
-              No hay historial aÃºn para esta sesiÃ³n.
+              No hay historial aun para esta sesion.
             </div>
           )}
         </div>
@@ -243,7 +245,7 @@ export default function ClientTracking() {
         onClick={() => navigate('/cliente/menu')}
         className="w-full mt-6 py-3 border rounded-xl font-medium text-sm active:scale-[0.97] transition-transform"
       >
-        Agregar mÃ¡s productos
+        Agregar mas productos
       </button>
     </div>
   );

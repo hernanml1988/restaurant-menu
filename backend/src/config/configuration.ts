@@ -17,6 +17,12 @@ export default () => ({
     accessTokenTtl: process.env.JWT_ACCESS_TTL || '1h',
     refreshTokenTtl: process.env.JWT_REFRESH_TTL || '7d',
   },
+  bootstrap: {
+    allowPublicEndpoints:
+      process.env.ALLOW_PUBLIC_BOOTSTRAP === undefined
+        ? undefined
+        : process.env.ALLOW_PUBLIC_BOOTSTRAP === 'true',
+  },
   fiscalization: {
     enabled: process.env.FISCALIZATION_ENABLED === 'true',
   },
