@@ -48,6 +48,7 @@ export class OrderService {
 
   private async getNextOrderNumber(manager: EntityManager) {
     const sequenceRepository = manager.getRepository(OrderSequence);
+    const orderRepository = manager.getRepository(Order);
     const scope = 'global';
 
     let sequence = await sequenceRepository.findOne({
@@ -62,6 +63,13 @@ export class OrderService {
       });
     }
 
+    const currentMaxOrder = await orderRepository
+      .createQueryBuilder('order')
+      .select('COALESCE(MAX(order.number), 0)', 'max')
+      .getRawOne<{ max: string }>();
+
+    const persistedMax = Number(currentMaxOrder?.max ?? 0);
+    sequence.lastNumber = Math.max(Number(sequence.lastNumber ?? 0), persistedMax);
     sequence.lastNumber += 1;
     await sequenceRepository.save(sequence);
     return sequence.lastNumber;

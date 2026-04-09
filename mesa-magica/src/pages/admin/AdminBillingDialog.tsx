@@ -295,7 +295,7 @@ export default function AdminBillingDialog({
         onOpenChange(nextOpen);
       }}
     >
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+      <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Cobro y cierre de cuenta</DialogTitle>
           <DialogDescription>
@@ -303,25 +303,26 @@ export default function AdminBillingDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {accountQuery.isLoading && (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            Cargando cuenta...
-          </p>
-        )}
+        <div className="min-h-0 overflow-y-auto pr-2">
+          {accountQuery.isLoading && (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Cargando cuenta...
+            </p>
+          )}
 
-        {accountQuery.error && (
-          <Alert className="border-destructive/30 bg-destructive/5">
-            <AlertTitle>No se pudo cargar la cuenta</AlertTitle>
-            <AlertDescription>
-              {accountQuery.error instanceof Error
-                ? accountQuery.error.message
-                : 'Error inesperado.'}
-            </AlertDescription>
-          </Alert>
-        )}
+          {accountQuery.error && (
+            <Alert className="border-destructive/30 bg-destructive/5">
+              <AlertTitle>No se pudo cargar la cuenta</AlertTitle>
+              <AlertDescription>
+                {accountQuery.error instanceof Error
+                  ? accountQuery.error.message
+                  : 'Error inesperado.'}
+              </AlertDescription>
+            </Alert>
+          )}
 
-        {account && (
-          <div className="space-y-5">
+          {account && (
+            <div className="space-y-5">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
               <div className="rounded-xl border p-4">
                 <p className="text-xs text-muted-foreground">Mesa</p>
@@ -691,8 +692,9 @@ export default function AdminBillingDialog({
                 )}
               </div>
             </div>
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

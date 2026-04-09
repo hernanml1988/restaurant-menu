@@ -695,7 +695,7 @@ export default function AdminOrders() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {selectedOrder ? `Pedido #${selectedOrder.number}` : 'Detalle del pedido'}
@@ -705,25 +705,26 @@ export default function AdminOrders() {
             </DialogDescription>
           </DialogHeader>
 
-          {orderDetailQuery.isLoading && (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              Cargando detalle del pedido...
-            </p>
-          )}
+          <div className="min-h-0 overflow-y-auto pr-2">
+            {orderDetailQuery.isLoading && (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Cargando detalle del pedido...
+              </p>
+            )}
 
-          {orderDetailQuery.error && (
-            <Alert className="border-destructive/30 bg-destructive/5">
-              <AlertTitle>No se pudo obtener el pedido</AlertTitle>
-              <AlertDescription>
-                {orderDetailQuery.error instanceof Error
-                  ? orderDetailQuery.error.message
-                  : 'Error inesperado.'}
-              </AlertDescription>
-            </Alert>
-          )}
+            {orderDetailQuery.error && (
+              <Alert className="border-destructive/30 bg-destructive/5">
+                <AlertTitle>No se pudo obtener el pedido</AlertTitle>
+                <AlertDescription>
+                  {orderDetailQuery.error instanceof Error
+                    ? orderDetailQuery.error.message
+                    : 'Error inesperado.'}
+                </AlertDescription>
+              </Alert>
+            )}
 
-          {selectedOrder && (
-            <div className="space-y-5">
+            {selectedOrder && (
+              <div className="space-y-5">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="rounded-xl border bg-muted/20 p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
@@ -929,8 +930,9 @@ export default function AdminOrders() {
                   )}
                 </div>
               )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -942,7 +944,7 @@ export default function AdminOrders() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {editingOrder ? `Editar pedido #${editingOrder.number}` : 'Editar pedido'}
@@ -952,7 +954,7 @@ export default function AdminOrders() {
             </DialogDescription>
           </DialogHeader>
 
-          <form className="grid gap-4" onSubmit={submitOrder}>
+          <form className="grid min-h-0 gap-4 overflow-y-auto pr-2" onSubmit={submitOrder}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="order-status">Estado</Label>
