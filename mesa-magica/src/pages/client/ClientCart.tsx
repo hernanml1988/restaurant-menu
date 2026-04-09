@@ -5,6 +5,7 @@ import { ArrowRight, Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from '@/components/ui/use-toast';
 import { useApp } from '@/context/AppContext';
+import { formatCurrency } from '@/lib/currency';
 import { createPublicOrderRequest } from '@/services/orderService';
 
 export default function ClientCart() {
@@ -159,7 +160,7 @@ export default function ClientCart() {
                       </button>
                     </div>
                     <span className="font-display text-primary">
-                      ${itemTotal.toFixed(2)}
+                      {formatCurrency(itemTotal)}
                     </span>
                   </div>
                 </div>
@@ -183,7 +184,7 @@ export default function ClientCart() {
         <div className="flex justify-between font-semibold text-lg">
           <span>Total</span>
           <span className="font-display text-primary tabular-nums">
-            ${cartTotal.toFixed(2)}
+            {formatCurrency(cartTotal)}
           </span>
         </div>
       </div>

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, ArrowLeft, Minus, Plus, ShoppingCart } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useApp, type CartExtraSelection } from '@/context/AppContext';
+import { formatCurrency } from '@/lib/currency';
 import { getPublicProductRequest } from '@/services/productService';
 
 const fallbackGradient = 'from-amber-100 to-orange-100';
@@ -106,7 +107,7 @@ export default function ClientProductDetail() {
         )}
         <h1 className="font-display text-2xl mb-1">{product.name}</h1>
         <p className="font-display text-primary text-2xl mb-4">
-          ${Number(product.price).toFixed(2)}
+          {formatCurrency(Number(product.price))}
         </p>
         <p className="text-muted-foreground text-sm leading-relaxed mb-4">
           {product.description}
@@ -182,7 +183,7 @@ export default function ClientProductDetail() {
                         <span>{extra.name}</span>
                         {Number(extra.price) > 0 && (
                           <span className="text-primary font-medium">
-                            +${Number(extra.price).toFixed(2)}
+                            +{formatCurrency(Number(extra.price))}
                           </span>
                         )}
                       </button>
@@ -228,9 +229,10 @@ export default function ClientProductDetail() {
           className="w-full bg-primary text-primary-foreground font-semibold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-primary/25 hover:shadow-xl transition-all active:scale-[0.97] disabled:opacity-50"
         >
           <ShoppingCart className="w-5 h-5" />
-          Agregar Â· ${total.toFixed(2)}
+          Agregar · {formatCurrency(total)}
         </button>
       </div>
     </div>
   );
 }
+

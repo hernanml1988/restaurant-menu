@@ -5,6 +5,7 @@ import { Search, ShoppingCart, Star } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useApp } from '@/context/AppContext';
 import { useRestaurantProfile } from '@/hooks/use-restaurant-profile';
+import { formatCurrency } from '@/lib/currency';
 import { getPublicCategoriesRequest } from '@/services/categoryService';
 import { getPublicProductsRequest } from '@/services/productService';
 
@@ -174,7 +175,7 @@ export default function ClientMenu() {
                   {product.name}
                 </h3>
                 <p className="font-display text-primary text-base">
-                  ${Number(product.price).toFixed(2)}
+                  {formatCurrency(Number(product.price))}
                 </p>
               </div>
             </button>

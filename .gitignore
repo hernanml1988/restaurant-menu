@@ -2,6 +2,8 @@
 .env.*
 *.env
 *.md
+!README.md
+!MANUAL_USUARIO.md
 !QA_E2E_CHECKLIST.md
 !backend/README.md
 !mesa-magica/README.md

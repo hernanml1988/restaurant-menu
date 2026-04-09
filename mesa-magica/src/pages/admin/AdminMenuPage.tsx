@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
+import { formatCurrency } from '@/lib/currency';
 import {
   createCategoryRequest,
   deactivateCategoryRequest,
@@ -291,7 +292,7 @@ export default function AdminMenuPage() {
 
   const submitProduct = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const price = Number(productForm.price);
+    const price = Math.round(Number(productForm.price));
     if (
       !restaurantId ||
       !productForm.name.trim() ||
@@ -471,7 +472,7 @@ export default function AdminMenuPage() {
                         : 'Sin categoria'}
                     </td>
                     <td className="px-4 py-3 text-right font-display tabular-nums">
-                      ${Number(product.price).toFixed(2)}
+                      {formatCurrency(Number(product.price))}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {product.trackStock ? (
@@ -605,7 +606,7 @@ export default function AdminMenuPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="product-price">Precio</Label>
-                <Input id="product-price" type="number" min={0} step="0.01" value={productForm.price} onChange={(e) => setProductForm((current) => ({ ...current, price: e.target.value }))} />
+                <Input id="product-price" type="number" min={0} step="1" value={productForm.price} onChange={(e) => setProductForm((current) => ({ ...current, price: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-2">

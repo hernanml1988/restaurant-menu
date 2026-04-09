@@ -50,6 +50,31 @@ export class DiningSessionService {
     return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
   }
 
+  private getSessionSortTimestamp(session: DiningSession) {
+    const startedAt = session.startedAt ? new Date(session.startedAt).getTime() : 0;
+    const createdAt = session.createdAt ? new Date(session.createdAt).getTime() : 0;
+    return Math.max(startedAt, createdAt, 0);
+  }
+
+  private pickSessionToReuse(sessions: DiningSession[]) {
+    const orderedSessions = [...sessions].sort(
+      (left, right) =>
+        this.getSessionSortTimestamp(right) - this.getSessionSortTimestamp(left),
+    );
+
+    const withActivity = orderedSessions.filter((session) => {
+      const hasOrders = (session.orders?.length ?? 0) > 0;
+      const hasPayments = (session.payments?.length ?? 0) > 0;
+      return hasOrders || hasPayments;
+    });
+
+    if (withActivity.length > 0) {
+      return withActivity[0];
+    }
+
+    return orderedSessions[0] ?? null;
+  }
+
   private buildSessionSummary(session: DiningSession) {
     const orders = session.orders ?? [];
     const payments = session.payments ?? [];
@@ -279,6 +304,47 @@ export class DiningSessionService {
         return {
           message: 'Sesion reutilizada exitosamente',
           data: this.buildSessionSummary(existingSession),
+        };
+      }
+
+      const activeSessions = await this.diningSessionRepository.find({
+        where: {
+          table: { id: table.id },
+          active: true,
+          state: true,
+        },
+        relations: {
+          restaurant: true,
+          table: true,
+          orders: {
+            items: {
+              selectedExtras: {
+                productExtra: true,
+              },
+            },
+          },
+          payments: true,
+        },
+      });
+
+      if (activeSessions.length > 0) {
+        if (activeSessions.length > 1) {
+          this.logger.warn(
+            `[start] multipleActiveSessionsDetected tableId=${table.id} sessions=${activeSessions
+              .map((session) => session.sessionToken)
+              .join(',')}`,
+          );
+        }
+
+        const sessionToReuse = this.pickSessionToReuse(activeSessions);
+
+        this.logger.log(
+          `[start] reusedLatestActiveSession sessionToken="${sessionToReuse.sessionToken}" tableId=${table.id}`,
+        );
+
+        return {
+          message: 'Sesion activa reutilizada exitosamente',
+          data: this.buildSessionSummary(sessionToReuse),
         };
       }
 
