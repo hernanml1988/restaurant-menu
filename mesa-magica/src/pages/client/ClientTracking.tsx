@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Bell, Check, ChefHat, Clock, Package } from 'lucide-react';
@@ -57,6 +57,7 @@ function formatTime(value?: string | null) {
 export default function ClientTracking() {
   const navigate = useNavigate();
   const { session, lastSubmittedOrder } = useApp();
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const sessionRealtimeSource = useMemo(
     () =>
       session?.sessionToken
@@ -88,7 +89,31 @@ export default function ClientTracking() {
     });
   }, [sessionQuery.data?.orders]);
 
+  useEffect(() => {
+    if (!orders.length) {
+      setSelectedOrderId(null);
+      return;
+    }
+
+    setSelectedOrderId((currentSelectedOrderId) => {
+      if (
+        currentSelectedOrderId &&
+        orders.some((order) => order.id === currentSelectedOrderId)
+      ) {
+        return currentSelectedOrderId;
+      }
+
+      const defaultOrder =
+        orders.find((order) => order.id === lastSubmittedOrder?.id) ||
+        orders.find((order) => order.orderStatus !== 'delivered') ||
+        orders[0];
+
+      return defaultOrder?.id ?? null;
+    });
+  }, [lastSubmittedOrder?.id, orders]);
+
   const currentOrder =
+    orders.find((order) => order.id === selectedOrderId) ||
     orders.find((order) => order.id === lastSubmittedOrder?.id) ||
     orders.find((order) => order.orderStatus !== 'delivered') ||
     orders[0];
@@ -215,10 +240,17 @@ export default function ClientTracking() {
       <div className="mt-8 border-t pt-6">
         <h2 className="font-semibold text-sm mb-3">Historial de pedidos de esta mesa</h2>
         <div className="space-y-2">
-          {orders.map((order) => (
-            <div
+          {orders.map((order) => {
+            const isSelected = currentOrder?.id === order.id;
+
+            return (
+            <button
               key={order.id}
-              className="bg-card border rounded-xl p-3 flex items-center justify-between"
+              type="button"
+              onClick={() => setSelectedOrderId(order.id)}
+              className={`w-full bg-card border rounded-xl p-3 flex items-center justify-between text-left transition-colors ${
+                isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted/30'
+              }`}
             >
               <div>
                 <p className="text-sm font-medium">Pedido #{order.number}</p>
@@ -230,8 +262,9 @@ export default function ClientTracking() {
               <span className="font-display text-sm text-primary">
                 {formatMoney(Number(order.total))}
               </span>
-            </div>
-          ))}
+            </button>
+          );
+          })}
 
           {!orders.length && (
             <div className="bg-card border rounded-xl p-3 text-sm text-muted-foreground">
