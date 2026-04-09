@@ -2,6 +2,17 @@ import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Bell, Check, HelpCircle, Receipt } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
 import { useApp } from '@/context/AppContext';
 import { getDiningSessionRequest } from '@/services/diningSessionService';
@@ -43,6 +54,8 @@ const actions: Array<{
 export default function ClientCallWaiter() {
   const { session } = useApp();
   const [sent, setSent] = useState<ServiceRequestType | null>(null);
+  const [waiterDialogOpen, setWaiterDialogOpen] = useState(false);
+  const [waiterMessage, setWaiterMessage] = useState('');
 
   const sessionQuery = useQuery({
     queryKey: ['client', 'session', 'help', session?.sessionToken],
@@ -60,6 +73,10 @@ export default function ClientCallWaiter() {
     mutationFn: createPublicServiceRequestRequest,
     onSuccess: (serviceRequest) => {
       setSent(serviceRequest.type);
+      if (serviceRequest.type === 'waiter') {
+        setWaiterDialogOpen(false);
+        setWaiterMessage('');
+      }
       toast({ title: 'Solicitud enviada' });
     },
     onError: (error) =>
@@ -70,7 +87,7 @@ export default function ClientCallWaiter() {
       }),
   });
 
-  const handleSendRequest = (type: ServiceRequestType) => {
+  const handleSendRequest = (type: ServiceRequestType, notes?: string) => {
     if (!session) {
       toast({
         title: 'Sesión no disponible',
@@ -111,7 +128,26 @@ export default function ClientCallWaiter() {
     createServiceRequest.mutate({
       sessionToken: session.sessionToken,
       type,
+      notes,
     });
+  };
+
+  const handleWaiterRequest = () => {
+    if (!session) {
+      toast({
+        title: 'Sesión no disponible',
+        description: 'Escanea el QR de la mesa antes de solicitar ayuda.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setWaiterDialogOpen(true);
+  };
+
+  const submitWaiterRequest = () => {
+    const trimmedMessage = waiterMessage.trim();
+    handleSendRequest('waiter', trimmedMessage || undefined);
   };
 
   return (
@@ -167,7 +203,11 @@ export default function ClientCallWaiter() {
             return (
               <button
                 key={action.id}
-                onClick={() => handleSendRequest(action.id)}
+                onClick={() =>
+                  action.id === 'waiter'
+                    ? handleWaiterRequest()
+                    : handleSendRequest(action.id)
+                }
                 disabled={createServiceRequest.isPending || billBlocked}
                 className={`w-full flex items-center gap-4 p-5 rounded-2xl border text-left transition-all active:scale-[0.97] animate-slide-up ${
                   sent === action.id
@@ -212,6 +252,51 @@ export default function ClientCallWaiter() {
           </button>
         </div>
       )}
+
+      <Dialog
+        open={waiterDialogOpen}
+        onOpenChange={(open) => {
+          setWaiterDialogOpen(open);
+          if (!open && !createServiceRequest.isPending) {
+            setWaiterMessage('');
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Llamar mesero</DialogTitle>
+            <DialogDescription>
+              Puedes agregar un mensaje opcional para indicar lo que necesitas.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="waiter-message">Mensaje (opcional)</Label>
+            <Textarea
+              id="waiter-message"
+              value={waiterMessage}
+              onChange={(event) => setWaiterMessage(event.target.value)}
+              placeholder="Ej: necesitamos mas cubiertos, agua o asistencia en la mesa."
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setWaiterDialogOpen(false)}
+              disabled={createServiceRequest.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={submitWaiterRequest}
+              disabled={createServiceRequest.isPending}
+            >
+              {createServiceRequest.isPending ? 'Enviando...' : 'Enviar llamado'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
