@@ -57,7 +57,7 @@ function formatTime(value?: string | null) {
 export default function ClientTracking() {
   const navigate = useNavigate();
   const { session, lastSubmittedOrder } = useApp();
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedOrderKey, setSelectedOrderKey] = useState<string | null>(null);
   const sessionRealtimeSource = useMemo(
     () =>
       session?.sessionToken
@@ -89,18 +89,21 @@ export default function ClientTracking() {
     });
   }, [sessionQuery.data?.orders]);
 
+  const getOrderSelectionKey = (order: OrderRecord) =>
+    order.id?.trim() || `${order.number}-${order.createdAt}`;
+
   useEffect(() => {
     if (!orders.length) {
-      setSelectedOrderId(null);
+      setSelectedOrderKey(null);
       return;
     }
 
-    setSelectedOrderId((currentSelectedOrderId) => {
+    setSelectedOrderKey((currentSelectedOrderKey) => {
       if (
-        currentSelectedOrderId &&
-        orders.some((order) => order.id === currentSelectedOrderId)
+        currentSelectedOrderKey &&
+        orders.some((order) => getOrderSelectionKey(order) === currentSelectedOrderKey)
       ) {
-        return currentSelectedOrderId;
+        return currentSelectedOrderKey;
       }
 
       const defaultOrder =
@@ -108,12 +111,12 @@ export default function ClientTracking() {
         orders.find((order) => order.orderStatus !== 'delivered') ||
         orders[0];
 
-      return defaultOrder?.id ?? null;
+      return defaultOrder ? getOrderSelectionKey(defaultOrder) : null;
     });
   }, [lastSubmittedOrder?.id, orders]);
 
   const currentOrder =
-    orders.find((order) => order.id === selectedOrderId) ||
+    orders.find((order) => getOrderSelectionKey(order) === selectedOrderKey) ||
     orders.find((order) => order.id === lastSubmittedOrder?.id) ||
     orders.find((order) => order.orderStatus !== 'delivered') ||
     orders[0];
@@ -241,13 +244,14 @@ export default function ClientTracking() {
         <h2 className="font-semibold text-sm mb-3">Historial de pedidos de esta mesa</h2>
         <div className="space-y-2">
           {orders.map((order) => {
-            const isSelected = currentOrder?.id === order.id;
+            const orderKey = getOrderSelectionKey(order);
+            const isSelected = getOrderSelectionKey(currentOrder ?? order) === orderKey;
 
             return (
             <button
-              key={order.id}
+              key={orderKey}
               type="button"
-              onClick={() => setSelectedOrderId(order.id)}
+              onClick={() => setSelectedOrderKey(orderKey)}
               className={`w-full bg-card border rounded-xl p-3 flex items-center justify-between text-left transition-colors ${
                 isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted/30'
               }`}
