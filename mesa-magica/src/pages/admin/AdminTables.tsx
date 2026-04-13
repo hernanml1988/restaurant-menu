@@ -376,10 +376,19 @@ export default function AdminTables() {
   };
 
   const handlePrintQr = async (table: TableRecord) => {
+    if (!table.qrCode.trim()) {
+      toast({
+        title: 'No se pudo imprimir el QR',
+        description: 'La mesa no tiene un código QR válido para imprimir.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const popup = window.open(
       '',
       '_blank',
-      'width=900,height=800,noopener,noreferrer',
+      'width=900,height=800',
     );
 
     if (!popup) {
@@ -434,6 +443,7 @@ export default function AdminTables() {
         timeStyle: 'short',
       });
 
+      popup.document.open();
       popup.document.write(`
         <!doctype html>
         <html lang="es">
@@ -601,8 +611,23 @@ export default function AdminTables() {
         </html>
       `);
       popup.document.close();
-      popup.focus();
-      popup.print();
+
+      const triggerPrint = () => {
+        popup.focus();
+        popup.print();
+      };
+
+      if (popup.document.readyState === 'complete') {
+        window.setTimeout(triggerPrint, 120);
+      } else {
+        popup.addEventListener(
+          'load',
+          () => {
+            window.setTimeout(triggerPrint, 120);
+          },
+          { once: true },
+        );
+      }
     } catch (error) {
       popup.close();
       toast({
