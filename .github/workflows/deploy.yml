@@ -165,7 +165,7 @@ jobs:
 
             i=1
             while [ "$i" -le 24 ]; do
-              if curl -fsS --retry 2 --retry-delay 1 --retry-connrefused --retry-all-errors http://127.0.0.1:8081/ >/dev/null; then
+              if curl -fsS --retry 2 --retry-delay 1 --retry-connrefused http://127.0.0.1:8081/ >/dev/null; then
                 break
               fi
               if [ "$i" -eq 24 ]; then
@@ -179,7 +179,7 @@ jobs:
 
             i=1
             while [ "$i" -le 24 ]; do
-              if curl -fsS --retry 2 --retry-delay 1 --retry-connrefused --retry-all-errors http://127.0.0.1:3015/ >/dev/null; then
+              if curl -fsS --retry 2 --retry-delay 1 --retry-connrefused http://127.0.0.1:3015/ >/dev/null; then
                 break
               fi
               if [ "$i" -eq 24 ]; then
