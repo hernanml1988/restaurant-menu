@@ -1,63 +1,126 @@
-# Restaurant Menu - Implementacion del Sistema
+# Restaurant Menu - Documentacion Tecnica Integral
 
-Sistema web para operacion integral de restaurante con tres experiencias:
-- Cliente (flujo QR y pedidos)
-- Cocina (tablero operativo en tiempo real)
-- Administracion (gestion operativa y analitica)
+Sistema web para operacion integral de restaurante, con experiencias separadas por rol:
+- Cliente (flujo publico por QR)
+- Cocina (panel operativo interno)
+- Administracion (gestion operativa, cobro, caja y analitica)
 
 ## 1. Objetivo del sistema
 
-Permitir que un restaurante opere su ciclo completo de atencion desde una sola plataforma:
-- Apertura de mesa por QR
-- Toma y seguimiento de pedidos
-- Gestion de solicitudes de servicio
-- Cobro, cierre y reapertura de cuenta
-- Operacion de caja
-- Comprobantes y documentos fiscales internos
-- Reservas y reportes
+Centralizar la operacion del restaurante en una plataforma unica:
+- Apertura/reutilizacion de sesion por QR de mesa.
+- Toma de pedidos desde cliente.
+- Orquestacion de estados en cocina.
+- Atencion de solicitudes de servicio.
+- Cobro parcial/total por sesion.
+- Cierre y reapertura de cuenta.
+- Control de caja diaria.
+- Emision de comprobantes y documentos fiscales internos.
+- Reportes operativos.
 
 ## 2. Arquitectura
 
 Monorepo con dos aplicaciones principales:
-- `mesa-magica`: frontend SPA en React + Vite + TypeScript
-- `backend`: API NestJS + TypeORM + PostgreSQL
+- `mesa-magica`: frontend SPA (React 18 + Vite + TypeScript).
+- `backend`: API REST/SSE (NestJS 10 + TypeORM + PostgreSQL).
 
-Patrones operativos principales:
-- Frontend por vistas y servicios (`src/services`) con `react-query`
-- Backend modular por dominio (`module/controller/service/entity/dto`)
-- Tiempo real por SSE para sincronizar cliente/cocina/admin
+### 2.1 Estilo arquitectonico
 
-## 3. Modulos funcionales
+- Frontend:
+  - Ruteo por modulo (`/cliente`, `/cocina`, `/admin`).
+  - Capa de servicios HTTP en `mesa-magica/src/services`.
+  - Estado cliente publico centralizado en `AppContext`.
+  - Estado auth interno centralizado en `AuthContext`.
+  - Cache e invalidacion con `@tanstack/react-query`.
 
-### Cliente (publico)
-- Bienvenida por QR (`/cliente/bienvenida`)
-- Menu y detalle de producto
-- Carrito y envio de pedido
-- Seguimiento de estado del pedido
-- Solicitudes de servicio (mesero, ayuda, cuenta)
+- Backend:
+  - Arquitectura modular NestJS (`module/controller/service/entity/dto`).
+  - Persistencia con repositorios TypeORM.
+  - Validacion de entrada con `ValidationPipe` global + `class-validator` en DTO.
+  - Seguridad interna con JWT en cookie (`jwt`) + `RolesGuard`.
+  - Sincronizacion en tiempo real via SSE (`/realtime/internal`, `/realtime/public/session/:sessionToken`).
 
-### Cocina (interno, rol `kitchen`)
-- Tablero de pedidos por estado
-- Cambio de estado operativo (`received -> preparing -> ready -> delivered`)
-- Priorizacion de pedidos
+## 3. Modulos backend implementados
 
-### Administracion (interno, rol `admin`)
-- Dashboard y KPI
-- Mesas, menu, pedidos, usuarios
-- Cobro y cierre de cuentas
-- Caja diaria
-- Comprobantes y documentos fiscales internos
-- Reservas
-- Reportes
-- Bitacora
+- Core y acceso: `auth`, `user`, `role`, `profile`, `profile_role`.
+- Dominio operativo restaurante:
+  - `restaurant`
+  - `table`
+  - `category`
+  - `product`
+  - `dining_session`
+  - `order`
+  - `service_request`
+  - `payment`
+  - `cash_session`
+  - `receipt`
+  - `fiscal_document`
+  - `reservation`
+  - `report`
+  - `realtime`
+  - `audit_log`
 
-## 4. Requisitos
+## 4. Modulos frontend implementados
+
+- Cliente publico:
+  - `/cliente/bienvenida`
+  - `/cliente/menu`
+  - `/cliente/producto/:id`
+  - `/cliente/carrito`
+  - `/cliente/confirmacion`
+  - `/cliente/seguimiento`
+  - `/cliente/ayuda`
+
+- Cocina (rol `kitchen`):
+  - `/cocina`
+
+- Administracion (rol `admin`):
+  - `/admin` (dashboard)
+  - `/admin/mesas`
+  - `/admin/menu`
+  - `/admin/pedidos`
+  - `/admin/usuarios`
+  - `/admin/reportes`
+  - `/admin/reservas`
+  - `/admin/operaciones`
+  - `/admin/mis-datos`
+
+## 5. Seguridad y autorizacion
+
+### 5.1 Acceso interno
+
+- Login interno: `POST /auth/login`.
+- El backend setea cookies `jwt` y `refresh_token`.
+- Rutas internas usan `AuthGuard('jwt')` + `RolesGuard` + `@InternalRoles(...)`.
+- Roles internos soportados por sistema: `admin`, `kitchen`.
+
+### 5.2 Endpoints publicos (sin JWT)
+
+- Flujo cliente QR y sesion:
+  - `GET /table/public/qr`
+  - `POST /dining-session/public/start`
+  - `GET /dining-session/public/:sessionToken`
+- Pedido publico:
+  - `POST /order/public`
+- Solicitudes publicas:
+  - `POST /service-request/public`
+- Streaming publico por sesion:
+  - `SSE /realtime/public/session/:sessionToken`
+
+### 5.3 Bootstrap publico de usuarios (solo dev/test)
+
+- `POST /user/init-data`
+- `POST /user/public-create`
+
+Ambos se bloquean cuando `ALLOW_PUBLIC_BOOTSTRAP=false`.
+
+## 6. Requisitos
 
 - Node.js 20+
 - npm 10+
 - PostgreSQL 14+ (recomendado 16)
 
-## 5. Estructura de carpetas
+## 7. Estructura del repositorio
 
 ```text
 restaurant-menu/
@@ -67,14 +130,13 @@ restaurant-menu/
   skills.md
   README.md
   MANUAL_USUARIO.md
-  QA_E2E_CHECKLIST.md
+  GUIA_FLUJO_SISTEMA.md
+  GUIA_MODULOS_VALIDACIONES.md
 ```
 
-## 6. Configuracion de entorno
+## 8. Variables de entorno
 
-### 6.1 Backend (`backend/.env`)
-
-Variables minimas:
+### 8.1 Backend (`backend/.env`)
 
 ```env
 PORT=3015
@@ -99,20 +161,15 @@ FISCALIZATION_ENABLED=false
 SENDGRID_API_KEY=
 ```
 
-Notas:
-- En produccion, `ALLOW_PUBLIC_BOOTSTRAP` debe quedar en `false`.
-- En produccion, `JWT_SECRET` debe ser fuerte y privado.
-- `FRONTEND_PUBLIC_URL` se usa para generar/normalizar enlaces de QR.
-
-### 6.2 Frontend (`mesa-magica/.env`)
+### 8.2 Frontend (`mesa-magica/.env`)
 
 ```env
 VITE_API_URL=http://localhost:3015
 ```
 
-## 7. Instalacion y ejecucion local
+## 9. Instalacion y ejecucion local (modo recomendado)
 
-### 7.1 Instalar dependencias
+### 9.1 Instalar dependencias
 
 ```bash
 cd backend
@@ -122,52 +179,27 @@ cd ../mesa-magica
 npm install
 ```
 
-### 7.2 Levantar backend
+### 9.2 Levantar backend
 
 ```bash
 cd backend
 npm run start:dev
 ```
 
-API por defecto: `http://localhost:3015`
-
-### 7.3 Levantar frontend
+### 9.3 Levantar frontend
 
 ```bash
 cd mesa-magica
 npm run dev
 ```
 
-UI por defecto: `http://localhost:5173`
+URLs por defecto:
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:3015`
 
-## 8. Bootstrap inicial (solo dev/test)
+## 10. Pruebas y build
 
-Si necesitas usuario inicial desde endpoint publico:
-
-```bash
-curl -X POST http://localhost:3015/user/init-data
-```
-
-O crear un usuario publico controlado:
-
-```bash
-curl -X POST http://localhost:3015/user/public-create \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "admin@demo.cl",
-    "password": "Admin123456",
-    "name": "Admin",
-    "lastname": "Demo"
-  }'
-```
-
-Importante:
-- Estos endpoints estan bloqueados en produccion por defecto.
-- Solo habilitan con `ALLOW_PUBLIC_BOOTSTRAP=true` o entorno dev/test.
-
-## 9. Pruebas y validacion
-
-### 9.1 Frontend
+### 10.1 Frontend
 
 ```bash
 cd mesa-magica
@@ -175,7 +207,7 @@ npm run test
 npm run build
 ```
 
-### 9.2 Backend
+### 10.2 Backend
 
 ```bash
 cd backend
@@ -184,62 +216,56 @@ npm run test:e2e
 npm run build
 ```
 
-### 9.3 Cierre funcional por rol
+## 11. Docker (opcional)
 
-Usar checklist:
-- `QA_E2E_CHECKLIST.md`
-
-## 10. Documentacion API
-
-Ejemplos de consumo manual por recurso:
-- `backend/docs/curl/*.curl.md`
-
-Incluye modulos: auth, user, table, category, product, dining-session, order, service-request, payment, cash-session, receipt, fiscal-document, reservation, report, realtime, audit-log.
-
-## 11. Despliegue con Docker (opcional)
-
-Desde raiz:
+El repositorio incluye `docker-compose.yml` como alternativa.
 
 ```bash
 docker compose up --build
 ```
 
-Servicios:
+Servicios esperados:
 - Frontend: `http://localhost:8080`
 - Backend: `http://localhost:3015`
 - PostgreSQL: `localhost:5433`
 
-## 12. Seguridad minima para produccion
+## 12. Convenciones operativas relevantes
 
-Checklist minimo antes de salir a productivo:
-- `ALLOW_PUBLIC_BOOTSTRAP=false`
-- `JWT_SECRET` privado y robusto
-- Variables de BD fuera de repositorio
-- `DATABASE_SYNCHRONIZE=false`
-- `DATABASE_MIGRATIONS_RUN=true`
-- CORS ajustado a dominios reales
-- Usuario admin validado y control de roles activo
+- Eliminaciones administrativas: borrado logico (`state=false`) en recursos operativos.
+- Cliente QR:
+  - El QR de mesa permanece fijo y no cambia por cada cliente.
+  - El backend reutiliza sesion activa si existe y sigue operativa.
+  - Si hay varias sesiones activas, prioriza la mas reciente con actividad.
+  - Si el token previo del cliente ya no es valido, el inicio publico cae a sesion activa o crea una nueva.
+- Pedidos publicos:
+  - Requieren caja abierta (`cash_session` en estado `open`).
+  - Descuentan stock cuando `trackStock=true`.
+  - Se bloquean cuando la sesion ya fue pagada o cerrada y se solicita reescanear QR.
+- Solicitudes publicas:
+  - Se bloquean cuando la sesion ya fue pagada o cerrada y se solicita reescanear QR.
+- Cobro:
+  - Pago no puede exceder saldo pendiente.
+  - Solo efectivo admite vuelto.
+- Cierre de cuenta:
+  - Requiere pedidos existentes.
+  - Requiere saldo en cero.
+  - Al llegar a saldo cero por pagos, la sesion se cierra automaticamente.
 
-## 13. Troubleshooting rapido
+## 13. Documentacion complementaria
 
-### Error de CORS
-- Revisar `FRONTEND_PUBLIC_URL` y `CORS_EXTRA_ORIGINS` en backend.
+- Flujo integral del sistema:
+  - `GUIA_FLUJO_SISTEMA.md`
+- Guia por modulo y validaciones:
+  - `GUIA_MODULOS_VALIDACIONES.md`
+- Manual funcional de uso:
+  - `MANUAL_USUARIO.md`
+- Curl por recurso backend:
+  - `backend/docs/curl/*.curl.md`
 
-### Error de login interno
-- Verificar cookies en navegador y que el usuario tenga rol interno compatible (`admin` o `kitchen`).
+## 14. Estado actual
 
-### Error en `test:e2e`
-- Validar conectividad y credenciales PostgreSQL.
-- Confirmar que la BD este levantada y accesible desde backend.
-
-### QR no abre mesa
-- Verificar `FRONTEND_PUBLIC_URL` y formato del token QR.
-- Validar que la mesa exista y este activa.
-
-## 14. Estado actual de implementacion
-
-- Integracion frontend-backend activa
-- Tiempo real SSE activo
-- Flujos principales de cliente, cocina y administracion implementados
-- Hardening de bootstrap publico aplicado
-- Documentacion tecnica y operativa disponible en repositorio
+- Integracion frontend-backend activa.
+- Seguridad por JWT cookie + rol interno en rutas administrativas/operativas.
+- Sincronizacion en tiempo real por SSE.
+- Flujos principales de cliente, cocina y administracion implementados.
+- Persistencia y evolucion de esquema mediante TypeORM + migraciones.

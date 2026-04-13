@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, Bell, MapPin, Receipt } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useApp } from '@/context/AppContext';
 import { useRestaurantProfile } from '@/hooks/use-restaurant-profile';
+import { isClientSessionResetError } from '@/lib/clientSession';
 import { startDiningSessionRequest } from '@/services/diningSessionService';
 import logo from '@/assets/restaurant-logo.png';
 
@@ -13,10 +14,14 @@ export default function ClientWelcome() {
   const [searchParams] = useSearchParams();
   const { profile } = useRestaurantProfile();
   const { session, setSession } = useApp();
+  const [ignoreExistingSessionToken, setIgnoreExistingSessionToken] =
+    useState(false);
 
   const qrCode = searchParams.get('qr')?.trim() || session?.table?.qrCode || '';
   const existingSessionToken =
-    session?.table?.qrCode === qrCode ? session.sessionToken : undefined;
+    !ignoreExistingSessionToken && session?.table?.qrCode === qrCode
+      ? session.sessionToken
+      : undefined;
 
   const sessionQuery = useQuery({
     queryKey: ['client', 'session', qrCode, existingSessionToken],
@@ -30,10 +35,27 @@ export default function ClientWelcome() {
   });
 
   useEffect(() => {
+    setIgnoreExistingSessionToken(false);
+  }, [qrCode]);
+
+  useEffect(() => {
     if (sessionQuery.data) {
       setSession(sessionQuery.data);
     }
-  }, [sessionQuery.data]);
+  }, [sessionQuery.data, setSession]);
+
+  useEffect(() => {
+    if (
+      !sessionQuery.error ||
+      !existingSessionToken ||
+      !isClientSessionResetError(sessionQuery.error)
+    ) {
+      return;
+    }
+
+    setSession(null);
+    setIgnoreExistingSessionToken(true);
+  }, [existingSessionToken, sessionQuery.error, setSession]);
 
   const activeSession = sessionQuery.data ?? session;
   const tableName = activeSession?.table?.name ?? 'Mesa no determinada';

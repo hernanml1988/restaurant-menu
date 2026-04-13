@@ -30,6 +30,8 @@ import { extractTableQrToken } from '../table/table-qr.utils';
 @Injectable()
 export class DiningSessionService {
   private readonly logger = new Logger(DiningSessionService.name);
+  private static readonly PUBLIC_SESSION_RESET_MESSAGE =
+    'La sesion ya no esta disponible para esta mesa. Escanea nuevamente el QR para continuar.';
 
   constructor(
     @InjectRepository(DiningSession)
@@ -163,6 +165,51 @@ export class DiningSessionService {
     return session;
   }
 
+  private async finalizeSessionClose(
+    session: DiningSession,
+    actor: string,
+    action: 'dining-session.closed' | 'dining-session.auto-closed',
+    metadata: Record<string, unknown> = {},
+  ) {
+    if (!session.active && session.accountStatus === DiningSessionAccountStatusEnum.CLOSED) {
+      return session;
+    }
+
+    session.active = false;
+    session.closedAt = session.closedAt ?? new Date();
+    session.accountStatus = DiningSessionAccountStatusEnum.CLOSED;
+    session.modifiedBy = actor;
+    await this.diningSessionRepository.save(session);
+
+    await this.serviceRequestRepository.update(
+      {
+        diningSession: { id: session.id },
+        type: ServiceRequestTypeEnum.BILL,
+        requestStatus: ServiceRequestStatusEnum.PENDING,
+      },
+      {
+        requestStatus: ServiceRequestStatusEnum.ATTENDED,
+        attendedAt: new Date(),
+        modifiedBy: actor,
+      },
+    );
+
+    await this.syncTableServiceState(session.table.id);
+    await this.auditLogService.record({
+      actor,
+      action,
+      entityType: 'dining_session',
+      entityId: session.id,
+      metadata: {
+        sessionToken: session.sessionToken,
+        closedAt: session.closedAt?.toISOString() ?? null,
+        ...metadata,
+      },
+    });
+
+    return session;
+  }
+
   public async getAccountSummaryByToken(sessionToken: string) {
     const session = await this.loadSessionByToken(sessionToken, true);
     return this.buildSessionSummary(session);
@@ -215,7 +262,12 @@ export class DiningSessionService {
     await this.tableRepository.save(table);
   }
 
-  public async syncSessionFinancialState(sessionId: string, actor = 'system01') {
+  public async syncSessionFinancialState(
+    sessionId: string,
+    actor = 'system01',
+    options?: { autoCloseWhenPaid?: boolean },
+  ) {
+    const autoCloseWhenPaid = options?.autoCloseWhenPaid ?? true;
     const session = await this.diningSessionRepository.findOne({
       where: {
         id: sessionId,
@@ -236,7 +288,23 @@ export class DiningSessionService {
 
     if (!session.active) {
       session.accountStatus = DiningSessionAccountStatusEnum.CLOSED;
-    } else if (summary.balanceDue <= 0 && summary.totalAccount > 0) {
+      session.modifiedBy = actor;
+      await this.diningSessionRepository.save(session);
+      await this.syncTableServiceState(session.table.id);
+      return session;
+    }
+
+    if (summary.balanceDue <= 0 && summary.totalAccount > 0) {
+      if (autoCloseWhenPaid) {
+        return this.finalizeSessionClose(
+          session,
+          actor,
+          'dining-session.auto-closed',
+          {
+            reason: 'paid-in-full',
+          },
+        );
+      }
       session.accountStatus = DiningSessionAccountStatusEnum.PAID;
     } else if (
       session.accountStatus === DiningSessionAccountStatusEnum.PAYMENT_PENDING
@@ -294,17 +362,19 @@ export class DiningSessionService {
         });
 
         if (!existingSession) {
-          throw new NotFoundException('Dining session not found');
+          this.logger.warn(
+            `[start] existingSessionTokenNotReusable token="${startDiningSessionDto.existingSessionToken}" tableId=${table.id}; fallbackToActiveOrNewSession=true`,
+          );
+        } else {
+          this.logger.log(
+            `[start] reusedSession sessionToken="${existingSession.sessionToken}" tableId=${table.id}`,
+          );
+
+          return {
+            message: 'Sesion reutilizada exitosamente',
+            data: this.buildSessionSummary(existingSession),
+          };
         }
-
-        this.logger.log(
-          `[start] reusedSession sessionToken="${existingSession.sessionToken}" tableId=${table.id}`,
-        );
-
-        return {
-          message: 'Sesion reutilizada exitosamente',
-          data: this.buildSessionSummary(existingSession),
-        };
       }
 
       const activeSessions = await this.diningSessionRepository.find({
@@ -410,6 +480,14 @@ export class DiningSessionService {
         data: this.buildSessionSummary(session),
       };
     } catch (error) {
+      if (error instanceof NotFoundException) {
+        Utils.errorResponse(
+          new BadRequestException(
+            DiningSessionService.PUBLIC_SESSION_RESET_MESSAGE,
+          ),
+        );
+        return;
+      }
       this.logger.error(
         `[findActiveByToken] failed sessionToken="${sessionToken}" message="${error.message}"`,
         error.stack,
@@ -495,37 +573,11 @@ export class DiningSessionService {
           'La cuenta no puede cerrarse mientras exista saldo pendiente.',
         );
       }
-
-      session.active = false;
-      session.closedAt = new Date();
-      session.accountStatus = DiningSessionAccountStatusEnum.CLOSED;
-      session.modifiedBy = actor || closeDiningSessionDto?.closedBy?.trim() || 'system01';
-      await this.diningSessionRepository.save(session);
-
-      await this.serviceRequestRepository.update(
-        {
-          diningSession: { id: session.id },
-          type: ServiceRequestTypeEnum.BILL,
-          requestStatus: ServiceRequestStatusEnum.PENDING,
-        },
-        {
-          requestStatus: ServiceRequestStatusEnum.ATTENDED,
-          attendedAt: new Date(),
-          modifiedBy: actor,
-        },
+      await this.finalizeSessionClose(
+        session,
+        actor || closeDiningSessionDto?.closedBy?.trim() || 'system01',
+        'dining-session.closed',
       );
-
-      await this.syncTableServiceState(session.table.id);
-      await this.auditLogService.record({
-        actor,
-        action: 'dining-session.closed',
-        entityType: 'dining_session',
-        entityId: session.id,
-        metadata: {
-          sessionToken: session.sessionToken,
-          closedAt: session.closedAt?.toISOString() ?? null,
-        },
-      });
 
       return {
         message: 'Sesion cerrada exitosamente',
@@ -559,10 +611,11 @@ export class DiningSessionService {
 
       session.active = true;
       session.closedAt = null;
+      session.accountStatus = DiningSessionAccountStatusEnum.OPEN;
       session.modifiedBy =
         actor || reopenDiningSessionDto?.reopenedBy?.trim() || 'system01';
       await this.diningSessionRepository.save(session);
-      await this.syncSessionFinancialState(session.id, session.modifiedBy);
+      await this.syncTableServiceState(session.table.id);
       await this.auditLogService.record({
         actor,
         action: 'dining-session.reopened',

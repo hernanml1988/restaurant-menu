@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -19,6 +23,9 @@ import {
 
 @Injectable()
 export class ServiceRequestService {
+  private static readonly PUBLIC_SESSION_RESET_MESSAGE =
+    'La sesion ya no esta disponible para esta mesa. Escanea nuevamente el QR para continuar.';
+
   constructor(
     @InjectRepository(ServiceRequest)
     private readonly serviceRequestRepository: Repository<ServiceRequest>,
@@ -80,7 +87,6 @@ export class ServiceRequestService {
       const diningSession = await this.diningSessionRepository.findOne({
         where: {
           sessionToken: createPublicServiceRequestDto.sessionToken,
-          active: true,
           state: true,
         },
         relations: {
@@ -90,7 +96,24 @@ export class ServiceRequestService {
       });
 
       if (!diningSession) {
-        throw new NotFoundException('Dining session not found');
+        throw new BadRequestException(
+          ServiceRequestService.PUBLIC_SESSION_RESET_MESSAGE,
+        );
+      }
+
+      if (!diningSession.active) {
+        throw new BadRequestException(
+          ServiceRequestService.PUBLIC_SESSION_RESET_MESSAGE,
+        );
+      }
+
+      if (
+        diningSession.accountStatus === DiningSessionAccountStatusEnum.PAID ||
+        diningSession.accountStatus === DiningSessionAccountStatusEnum.CLOSED
+      ) {
+        throw new BadRequestException(
+          ServiceRequestService.PUBLIC_SESSION_RESET_MESSAGE,
+        );
       }
 
       const serviceRequest = this.serviceRequestRepository.create({

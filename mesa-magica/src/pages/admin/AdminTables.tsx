@@ -7,6 +7,7 @@ import {
 import QRCode from 'qrcode';
 import {
   Pencil,
+  Printer,
   Plus,
   QrCode,
   Trash2,
@@ -95,6 +96,15 @@ const defaultTableFormState: TableFormState = {
   activeOrders: '0',
   qrCode: '',
 };
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 function QrPreview({ value }: { value: string }) {
   const [qrDataUrl, setQrDataUrl] = useState('');
@@ -365,6 +375,247 @@ export default function AdminTables() {
     });
   };
 
+  const handlePrintQr = async (table: TableRecord) => {
+    const popup = window.open(
+      '',
+      '_blank',
+      'width=900,height=800,noopener,noreferrer',
+    );
+
+    if (!popup) {
+      toast({
+        title: 'No se pudo abrir la impresion',
+        description:
+          'Permite ventanas emergentes para imprimir el QR de esta mesa.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    popup.document.write(`
+      <!doctype html>
+      <html lang="es">
+        <head>
+          <meta charset="utf-8" />
+          <title>Preparando impresion...</title>
+          <style>
+            body {
+              margin: 0;
+              display: grid;
+              place-items: center;
+              min-height: 100vh;
+              font-family: "DM Sans", "Segoe UI", sans-serif;
+              background: #f6f0e5;
+              color: #2a2017;
+            }
+          </style>
+        </head>
+        <body>Generando QR para impresion...</body>
+      </html>
+    `);
+    popup.document.close();
+
+    try {
+      const qrDataUrl = await QRCode.toDataURL(table.qrCode, {
+        width: 360,
+        margin: 1,
+      });
+
+      const restaurantName =
+        restaurantQuery.data?.name?.trim() ||
+        table.restaurant?.name?.trim() ||
+        'Restaurante';
+      const restaurantTagline = restaurantQuery.data?.tagline?.trim() || '';
+      const restaurantAddress = restaurantQuery.data?.address?.trim() || '';
+      const restaurantPhone = restaurantQuery.data?.phone?.trim() || '';
+      const restaurantEmail = restaurantQuery.data?.email?.trim() || '';
+      const printDate = new Date().toLocaleString('es-CL', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      });
+
+      popup.document.write(`
+        <!doctype html>
+        <html lang="es">
+          <head>
+            <meta charset="utf-8" />
+            <title>QR ${escapeHtml(table.name)} - ${escapeHtml(restaurantName)}</title>
+            <style>
+              :root {
+                color-scheme: light;
+              }
+              * {
+                box-sizing: border-box;
+              }
+              body {
+                margin: 0;
+                font-family: "DM Sans", "Segoe UI", sans-serif;
+                background: #f6f0e5;
+                color: #2a2017;
+              }
+              .sheet {
+                max-width: 760px;
+                margin: 32px auto;
+                background: #ffffff;
+                border: 1px solid #e2d9ca;
+                border-radius: 24px;
+                overflow: hidden;
+              }
+              .header {
+                padding: 28px 30px 22px;
+                border-bottom: 1px dashed #e7dbc8;
+                background: linear-gradient(120deg, #fff6e8, #ffffff 60%);
+              }
+              .title {
+                margin: 0;
+                font-family: "DM Serif Display", Georgia, serif;
+                font-size: 34px;
+                line-height: 1.1;
+              }
+              .tagline {
+                margin: 8px 0 0;
+                color: #6f5a44;
+                font-size: 14px;
+              }
+              .content {
+                display: grid;
+                grid-template-columns: 1fr 300px;
+                gap: 24px;
+                padding: 28px 30px 30px;
+              }
+              .block {
+                margin-bottom: 14px;
+              }
+              .label {
+                margin: 0 0 4px;
+                color: #8a745d;
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: .06em;
+              }
+              .value {
+                margin: 0;
+                font-size: 16px;
+                font-weight: 600;
+              }
+              .meta {
+                font-size: 13px;
+                color: #5a4736;
+                margin-top: 18px;
+              }
+              .qr-card {
+                border: 1px solid #eadfce;
+                border-radius: 18px;
+                padding: 16px;
+                text-align: center;
+                background: #fffdf9;
+              }
+              .qr {
+                width: 240px;
+                height: 240px;
+                object-fit: contain;
+                background: white;
+                border-radius: 14px;
+                border: 1px solid #efeadf;
+                padding: 10px;
+              }
+              .qr-text {
+                margin-top: 10px;
+                font-size: 11px;
+                line-height: 1.3;
+                color: #7a6753;
+                word-break: break-word;
+              }
+              .footer {
+                border-top: 1px dashed #e7dbc8;
+                padding: 14px 30px 20px;
+                font-size: 12px;
+                color: #846f57;
+              }
+              @media print {
+                body {
+                  background: #ffffff;
+                }
+                .sheet {
+                  margin: 0;
+                  border: none;
+                  border-radius: 0;
+                  max-width: 100%;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <article class="sheet">
+              <header class="header">
+                <h1 class="title">${escapeHtml(restaurantName)}</h1>
+                ${
+                  restaurantTagline
+                    ? `<p class="tagline">${escapeHtml(restaurantTagline)}</p>`
+                    : ''
+                }
+              </header>
+              <section class="content">
+                <div>
+                  <div class="block">
+                    <p class="label">Mesa</p>
+                    <p class="value">${escapeHtml(table.name)} (N.${table.number})</p>
+                  </div>
+                  <div class="block">
+                    <p class="label">Zona y capacidad</p>
+                    <p class="value">${escapeHtml(table.zone)} � ${table.capacity} personas</p>
+                  </div>
+                  ${
+                    restaurantAddress
+                      ? `<div class="block"><p class="label">Direccion</p><p class="value">${escapeHtml(restaurantAddress)}</p></div>`
+                      : ''
+                  }
+                  ${
+                    restaurantPhone
+                      ? `<div class="block"><p class="label">Telefono</p><p class="value">${escapeHtml(restaurantPhone)}</p></div>`
+                      : ''
+                  }
+                  ${
+                    restaurantEmail
+                      ? `<div class="block"><p class="label">Email</p><p class="value">${escapeHtml(restaurantEmail)}</p></div>`
+                      : ''
+                  }
+                  <p class="meta">Impreso el ${escapeHtml(printDate)}.</p>
+                </div>
+                <aside class="qr-card">
+                  <img class="qr" src="${qrDataUrl}" alt="QR ${escapeHtml(
+                    table.name,
+                  )}" />
+                  <div class="qr-text">
+                    Escanea para abrir el menu digital de esta mesa.
+                    <br />
+                    ${escapeHtml(table.qrCode)}
+                  </div>
+                </aside>
+              </section>
+              <footer class="footer">
+                Documento de uso interno para atencion de sala.
+              </footer>
+            </article>
+          </body>
+        </html>
+      `);
+      popup.document.close();
+      popup.focus();
+      popup.print();
+    } catch (error) {
+      popup.close();
+      toast({
+        title: 'No se pudo imprimir el QR',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Intenta nuevamente en unos segundos.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="animate-fade-in">
       <div className="mb-6 flex items-center justify-between">
@@ -472,6 +723,12 @@ export default function AdminTables() {
                     className="flex flex-1 items-center justify-center gap-1 rounded-lg border py-2 text-xs font-medium hover:bg-muted active:scale-[0.97]"
                   >
                     <QrCode className="h-3 w-3" /> QR
+                  </button>
+                  <button
+                    onClick={() => void handlePrintQr(table)}
+                    className="flex flex-1 items-center justify-center gap-1 rounded-lg border py-2 text-xs font-medium hover:bg-muted active:scale-[0.97]"
+                  >
+                    <Printer className="h-3 w-3" /> Imprimir
                   </button>
                   <button
                     onClick={() => openEditDialog(table)}
@@ -674,3 +931,4 @@ export default function AdminTables() {
     </div>
   );
 }
+

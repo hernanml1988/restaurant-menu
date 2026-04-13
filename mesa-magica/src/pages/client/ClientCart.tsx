@@ -6,6 +6,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from '@/components/ui/use-toast';
 import { useApp } from '@/context/AppContext';
 import { formatCurrency } from '@/lib/currency';
+import {
+  buildClientWelcomePath,
+  isClientSessionResetError,
+} from '@/lib/clientSession';
 import { createPublicOrderRequest } from '@/services/orderService';
 
 export default function ClientCart() {
@@ -17,6 +21,7 @@ export default function ClientCart() {
     cartTotal,
     clearCart,
     session,
+    setSession,
     setLastSubmittedOrder,
   } = useApp();
   const [observations, setObservations] = useState('');
@@ -30,11 +35,19 @@ export default function ClientCart() {
       navigate('/cliente/confirmacion');
     },
     onError: (error) =>
-      toast({
-        title: 'No se pudo enviar el pedido',
-        description: error instanceof Error ? error.message : 'Error inesperado.',
-        variant: 'destructive',
-      }),
+      {
+        if (isClientSessionResetError(error)) {
+          const redirectPath = buildClientWelcomePath(session?.table?.qrCode);
+          setSession(null);
+          navigate(redirectPath, { replace: true });
+        }
+
+        toast({
+          title: 'No se pudo enviar el pedido',
+          description: error instanceof Error ? error.message : 'Error inesperado.',
+          variant: 'destructive',
+        });
+      },
   });
 
   if (cart.length === 0) {

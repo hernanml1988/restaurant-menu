@@ -5,6 +5,10 @@ import { Bell, Check, ChefHat, Clock, Package } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useApp } from '@/context/AppContext';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import {
+  buildClientWelcomePath,
+  isClientSessionResetError,
+} from '@/lib/clientSession';
 import { getDiningSessionRequest } from '@/services/diningSessionService';
 import type { OrderRecord } from '@/services/orderService';
 import { createSessionRealtimeSource } from '@/services/realtimeService';
@@ -56,7 +60,7 @@ function formatTime(value?: string | null) {
 
 export default function ClientTracking() {
   const navigate = useNavigate();
-  const { session, lastSubmittedOrder } = useApp();
+  const { session, lastSubmittedOrder, setSession } = useApp();
   const [selectedOrderKey, setSelectedOrderKey] = useState<string | null>(null);
   const sessionRealtimeSource = useMemo(
     () =>
@@ -77,6 +81,16 @@ export default function ClientTracking() {
       void sessionQuery.refetch();
     }
   });
+
+  useEffect(() => {
+    if (!sessionQuery.error || !isClientSessionResetError(sessionQuery.error)) {
+      return;
+    }
+
+    const redirectPath = buildClientWelcomePath(session?.table?.qrCode);
+    setSession(null);
+    navigate(redirectPath, { replace: true });
+  }, [navigate, session?.table?.qrCode, sessionQuery.error, setSession]);
 
   const orders = useMemo(() => {
     const currentOrders = sessionQuery.data?.orders ?? [];

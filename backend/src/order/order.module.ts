@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditLogModule } from '../audit_log/audit_log.module';
+import { CashSession } from '../cash_session/entities/cash_session.entity';
 import { DiningSession } from '../dining_session/entities/dining_session.entity';
 import { Payment } from '../payment/entities/payment.entity';
 import { Product } from '../product/entities/product.entity';
@@ -24,6 +25,7 @@ import { OrderItemExtraSelection } from './entities/order_item_extra_selection.e
       OrderItem,
       OrderItemExtraSelection,
       DiningSession,
+      CashSession,
       Product,
       ProductExtra,
       Table,

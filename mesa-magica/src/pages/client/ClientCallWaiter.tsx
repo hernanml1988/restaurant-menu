@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Bell, Check, HelpCircle, Receipt } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,6 +16,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
 import { useApp } from '@/context/AppContext';
+import {
+  buildClientWelcomePath,
+  isClientSessionResetError,
+} from '@/lib/clientSession';
 import { getDiningSessionRequest } from '@/services/diningSessionService';
 import {
   createPublicServiceRequestRequest,
@@ -52,7 +57,8 @@ const actions: Array<{
 ];
 
 export default function ClientCallWaiter() {
-  const { session } = useApp();
+  const navigate = useNavigate();
+  const { session, setSession } = useApp();
   const [sent, setSent] = useState<ServiceRequestType | null>(null);
   const [waiterDialogOpen, setWaiterDialogOpen] = useState(false);
   const [waiterMessage, setWaiterMessage] = useState('');
@@ -79,13 +85,30 @@ export default function ClientCallWaiter() {
       }
       toast({ title: 'Solicitud enviada' });
     },
-    onError: (error) =>
+    onError: (error) => {
+      if (isClientSessionResetError(error)) {
+        const redirectPath = buildClientWelcomePath(session?.table?.qrCode);
+        setSession(null);
+        navigate(redirectPath, { replace: true });
+      }
+
       toast({
         title: 'No se pudo enviar la solicitud',
         description: error instanceof Error ? error.message : 'Error inesperado.',
         variant: 'destructive',
-      }),
+      });
+    },
   });
+
+  useEffect(() => {
+    if (!sessionQuery.error || !isClientSessionResetError(sessionQuery.error)) {
+      return;
+    }
+
+    const redirectPath = buildClientWelcomePath(session?.table?.qrCode);
+    setSession(null);
+    navigate(redirectPath, { replace: true });
+  }, [navigate, session?.table?.qrCode, sessionQuery.error, setSession]);
 
   const handleSendRequest = (type: ServiceRequestType, notes?: string) => {
     if (!session) {

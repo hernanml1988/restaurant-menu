@@ -19,7 +19,9 @@ Ruta base: `/cliente`
 3. Confirmar que se muestre la mesa correcta.
 
 Resultado esperado:
-- Se abre o reutiliza una sesion de mesa activa.
+- El QR de la mesa se mantiene fijo.
+- Se abre o reutiliza una sesion activa de esa mesa.
+- Si el enlace/token anterior ya no es valido, el sistema inicia una sesion operativa nueva para esa mesa.
 
 ### 2.2 Ver menu y productos
 
@@ -141,11 +143,12 @@ Desde pedido o solicitud de cuenta:
 1. Abrir dialogo de cobro.
 2. Registrar pago (parcial o total).
 3. Repetir pagos hasta saldo cero.
-4. Cerrar cuenta.
+4. Al quedar saldo cero, la cuenta se cierra automaticamente.
 5. Reabrir cuenta solo si negocio lo requiere.
 
 Resultado esperado:
 - Cuenta queda saldada y con trazabilidad.
+- Sesiones pagadas/cerradas no aceptan nuevos pedidos o solicitudes publicas con tokens anteriores.
 
 ### 4.6 Operaciones (caja, comprobantes, fiscal)
 
@@ -197,6 +200,10 @@ Resultado esperado:
 ### Cliente no puede pedir cuenta
 - Verificar que existan pedidos.
 - Verificar que todos esten en estado entregado.
+
+### "La sesion ya no esta disponible para esta mesa"
+- Ocurre cuando el cliente intenta usar un token anterior de una cuenta pagada/cerrada.
+- Solicitar reescanear el mismo QR fisico de la mesa para iniciar sesion vigente.
 
 ### Cocina no recibe pedidos
 - Revisar conexion SSE y sesion activa.

@@ -6,7 +6,14 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, Repository } from 'typeorm';
 import { AuditLogService } from '../audit_log/audit_log.service';
-import { DiningSession } from '../dining_session/entities/dining_session.entity';
+import {
+  CashSession,
+  CashSessionStatusEnum,
+} from '../cash_session/entities/cash_session.entity';
+import {
+  DiningSession,
+  DiningSessionAccountStatusEnum,
+} from '../dining_session/entities/dining_session.entity';
 import { Payment, PaymentStatusEnum } from '../payment/entities/payment.entity';
 import { Product } from '../product/entities/product.entity';
 import { ProductExtra } from '../product_extra/entities/product_extra.entity';
@@ -27,6 +34,9 @@ import { OrderItemExtraSelection } from './entities/order_item_extra_selection.e
 
 @Injectable()
 export class OrderService {
+  private static readonly PUBLIC_SESSION_RESET_MESSAGE =
+    'La sesion ya no esta disponible para esta mesa. Escanea nuevamente el QR para continuar.';
+
   constructor(
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
@@ -34,6 +44,8 @@ export class OrderService {
     private readonly orderSequenceRepository: Repository<OrderSequence>,
     @InjectRepository(DiningSession)
     private readonly diningSessionRepository: Repository<DiningSession>,
+    @InjectRepository(CashSession)
+    private readonly cashSessionRepository: Repository<CashSession>,
     @InjectRepository(Table)
     private readonly tableRepository: Repository<Table>,
     @InjectRepository(Payment)
@@ -407,7 +419,6 @@ export class OrderService {
       const diningSession = await this.diningSessionRepository.findOne({
         where: {
           sessionToken: createPublicOrderDto.sessionToken,
-          active: true,
           state: true,
         },
         relations: {
@@ -417,7 +428,32 @@ export class OrderService {
       });
 
       if (!diningSession) {
-        throw new NotFoundException('Dining session not found');
+        throw new BadRequestException(OrderService.PUBLIC_SESSION_RESET_MESSAGE);
+      }
+
+      if (!diningSession.active) {
+        throw new BadRequestException(OrderService.PUBLIC_SESSION_RESET_MESSAGE);
+      }
+
+      if (
+        diningSession.accountStatus === DiningSessionAccountStatusEnum.PAID ||
+        diningSession.accountStatus === DiningSessionAccountStatusEnum.CLOSED
+      ) {
+        throw new BadRequestException(OrderService.PUBLIC_SESSION_RESET_MESSAGE);
+      }
+
+      const openCashSession = await this.cashSessionRepository.findOne({
+        where: {
+          restaurant: { id: diningSession.restaurant.id },
+          state: true,
+          sessionStatus: CashSessionStatusEnum.OPEN,
+        },
+      });
+
+      if (!openCashSession) {
+        throw new BadRequestException(
+          'La caja se encuentra cerrada. No es posible tomar pedidos en este momento.',
+        );
       }
 
       const now = new Date();

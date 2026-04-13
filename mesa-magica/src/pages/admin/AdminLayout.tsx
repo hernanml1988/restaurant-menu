@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -14,8 +15,10 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import logo from '@/assets/restaurant-logo.png';
+import { Badge } from '@/components/ui/badge';
 import { useRestaurantProfile } from '@/hooks/use-restaurant-profile';
 import { useAuth } from '@/context/AuthContext';
+import { getCurrentCashSessionRequest } from '@/services/cashSessionService';
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
@@ -33,7 +36,13 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const { profile } = useRestaurantProfile();
   const { user, logout } = useAuth();
+  const currentCashSessionQuery = useQuery({
+    queryKey: ['admin', 'cash-session', 'current'],
+    queryFn: getCurrentCashSessionRequest,
+  });
   const brandLogo = profile.logoDataUrl || logo;
+  const isCashClosed =
+    !currentCashSessionQuery.isLoading && !currentCashSessionQuery.data;
 
   return (
     <div className="flex min-h-screen">
@@ -51,6 +60,14 @@ export default function AdminLayout() {
             <p className="text-[10px] text-sidebar-foreground/50">
               Panel de administracion
             </p>
+            {isCashClosed ? (
+              <Badge
+                variant="destructive"
+                className="mt-2 border-0 text-[10px] font-semibold uppercase tracking-[0.14em]"
+              >
+                Caja cerrada
+              </Badge>
+            ) : null}
           </div>
         </div>
 
