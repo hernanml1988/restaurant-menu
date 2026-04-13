@@ -1,0 +1,57 @@
+services:
+  frontend:
+    image: ${FRONTEND_IMAGE}:${IMAGE_TAG}
+    container_name: mesa-magica-frontend
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  backend:
+    image: ${BACKEND_IMAGE}:${IMAGE_TAG}
+    container_name: mesa-magica-backend
+    restart: unless-stopped
+    env_file:
+      - /opt/mesa-magica/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3015
+      DATABASE_HOST: ${DATABASE_HOST}
+      DATABASE_PORT: ${DATABASE_PORT}
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_NAME: ${DATABASE_NAME}
+      DATABASE_SYNCHRONIZE: ${DATABASE_SYNCHRONIZE}
+      DATABASE_MIGRATIONS_RUN: ${DATABASE_MIGRATIONS_RUN}
+      FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL}
+      CORS_EXTRA_ORIGINS: ${CORS_EXTRA_ORIGINS}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL}
+      ALLOW_PUBLIC_BOOTSTRAP: ${ALLOW_PUBLIC_BOOTSTRAP}
+      FISCALIZATION_ENABLED: ${FISCALIZATION_ENABLED}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+    expose:
+      - "3015"
+    networks:
+      - app_network
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: mesa-magica-nginx
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /opt/mesa-magica/deploy/nginx:/etc/nginx/conf.d:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
