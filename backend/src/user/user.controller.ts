@@ -52,6 +52,13 @@ export class UserController {
     return this.userService.createPublic(createUserDto);
   }
 
+  @Post('admin-seed')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @InternalRoles('admin')
+  seedAdminData() {
+    return this.userService.seedAdminData();
+  }
+
   @Post()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @InternalRoles('admin')

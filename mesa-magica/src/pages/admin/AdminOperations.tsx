@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
 import { getAuditLogsRequest } from '@/services/auditLogService';
+import { seedAdminDataRequest } from '@/services/adminSeedService';
 import {
   closeCashSessionRequest,
   getCashSessionHistoryRequest,
@@ -92,6 +93,17 @@ export default function AdminOperations() {
     },
   });
 
+  const seedDataMutation = useMutation({
+    mutationFn: seedAdminDataRequest,
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: ['admin'] });
+      toast({
+        title: 'Datos de prueba cargados',
+        description: `Sesion demo activa: ${result.sessionToken}`,
+      });
+    },
+  });
+
   const currentCash = currentCashQuery.data;
   const cashHistory = useMemo(
     () => cashHistoryQuery.data ?? [],
@@ -136,6 +148,23 @@ export default function AdminOperations() {
           Caja, comprobantes, fiscalizacion interna y trazabilidad reciente.
         </p>
       </div>
+
+      <section className="rounded-2xl border bg-card p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-display text-2xl">Carga de datos de prueba</h2>
+            <p className="text-sm text-muted-foreground">
+              Crea datos en BDD para menu, pedidos, caja, reservas y operaciones.
+            </p>
+          </div>
+          <Button
+            onClick={() => seedDataMutation.mutate()}
+            disabled={seedDataMutation.isPending}
+          >
+            {seedDataMutation.isPending ? 'Cargando...' : 'Cargar datos de prueba'}
+          </Button>
+        </div>
+      </section>
 
       {(currentCashQuery.error ||
         cashHistoryQuery.error ||
