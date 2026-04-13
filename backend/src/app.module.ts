@@ -85,6 +85,13 @@ const appEntities = [
         username: configService.get<string>('database.username'),
         password: configService.get<string>('database.password'),
         database: configService.get<string>('database.database'),
+        ssl: configService.get<boolean>('database.ssl')
+          ? {
+              rejectUnauthorized: configService.get<boolean>(
+                'database.sslRejectUnauthorized',
+              ),
+            }
+          : false,
         entities: appEntities,
         synchronize: configService.get<boolean>('database.synchronize'),
         migrationsRun: configService.get<boolean>('database.migrationsRun'),

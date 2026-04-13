@@ -6,6 +6,9 @@ export default () => ({
     username: process.env.DATABASE_USERNAME,
     password: process.env.DATABASE_PASSWORD,
     database: process.env.DATABASE_NAME,
+    ssl: process.env.DATABASE_SSL === 'true',
+    sslRejectUnauthorized:
+      process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false',
     synchronize: process.env.DATABASE_SYNCHRONIZE === 'true',
     migrationsRun: process.env.DATABASE_MIGRATIONS_RUN !== 'false',
   },

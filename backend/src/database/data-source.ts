@@ -33,6 +33,11 @@ export default new DataSource({
   username: appConfig.database.username,
   password: appConfig.database.password,
   database: appConfig.database.database,
+  ssl: appConfig.database.ssl
+    ? {
+        rejectUnauthorized: appConfig.database.sslRejectUnauthorized,
+      }
+    : false,
   synchronize: false,
   migrationsRun: false,
   entities: [
