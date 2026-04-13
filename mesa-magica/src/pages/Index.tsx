@@ -1,18 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { Smartphone, ChefHat, Settings, LockKeyhole } from 'lucide-react';
+import { ChefHat, Settings, LockKeyhole } from 'lucide-react';
 import logo from '@/assets/restaurant-logo.png';
 import { useRestaurantProfile } from '@/hooks/use-restaurant-profile';
 
 const views = [
-  {
-    title: 'Cliente',
-    description:
-      'Experiencia movil del comensal. Escaneo QR, menu, pedidos y seguimiento.',
-    icon: Smartphone,
-    path: '/cliente/bienvenida',
-    color: 'bg-primary/10 text-primary',
-    border: 'hover:border-primary/40',
-  },
   {
     title: 'Cocina',
     description:
@@ -55,7 +46,7 @@ export default function Index() {
           {profile.tagline} - Prototipo interactivo
         </p>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           {views.map((view, index) => (
             <button
               key={view.title}
