@@ -85,7 +85,7 @@ jobs:
           target: "/opt/mesa-magica"
 
       - name: Deploy on Droplet
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         env:
           FRONTEND_IMAGE: ${{ steps.meta.outputs.frontend_image }}
           BACKEND_IMAGE: ${{ steps.meta.outputs.backend_image }}
