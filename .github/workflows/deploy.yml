@@ -163,7 +163,32 @@ jobs:
             docker compose -f deploy/docker-compose.prod.yml --env-file .env pull
             docker compose -f deploy/docker-compose.prod.yml --env-file .env up -d --remove-orphans
 
-            curl -fsS --retry 12 --retry-delay 5 --retry-connrefused http://127.0.0.1:8081/ >/dev/null
-            curl -fsS --retry 12 --retry-delay 5 --retry-connrefused http://127.0.0.1:3015/ >/dev/null
+            i=1
+            while [ "$i" -le 24 ]; do
+              if curl -fsS --retry 2 --retry-delay 1 --retry-connrefused http://127.0.0.1:8081/ >/dev/null; then
+                break
+              fi
+              if [ "$i" -eq 24 ]; then
+                echo "Frontend healthcheck failed after retries"
+                docker compose -f deploy/docker-compose.prod.yml --env-file .env logs --tail=100 frontend || true
+                exit 1
+              fi
+              sleep 5
+              i=$((i + 1))
+            done
+
+            i=1
+            while [ "$i" -le 24 ]; do
+              if curl -fsS --retry 2 --retry-delay 1 --retry-connrefused http://127.0.0.1:3015/ >/dev/null; then
+                break
+              fi
+              if [ "$i" -eq 24 ]; then
+                echo "Backend healthcheck failed after retries"
+                docker compose -f deploy/docker-compose.prod.yml --env-file .env logs --tail=100 backend || true
+                exit 1
+              fi
+              sleep 5
+              i=$((i + 1))
+            done
 
             docker image prune -f || true
