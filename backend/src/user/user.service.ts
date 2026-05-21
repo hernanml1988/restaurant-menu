@@ -9,7 +9,15 @@ import { Repository } from 'typeorm';
 import { StatusEnum } from '../enums/status.enum';
 import { Profile } from '../profile/entities/profile.entity';
 import { ProfileRole } from '../profile_role/entities/profile_role.entity';
+import { Restaurant } from '../restaurant/entities/restaurant.entity';
+import { RestaurantService } from '../restaurant/restaurant.service';
+import {
+  RestaurantStaff,
+  RestaurantStaffRoleEnum,
+} from '../restaurant_staff/entities/restaurant_staff.entity';
 import { Role } from '../role/entities/role.entity';
+import { LimitKindEnum } from '../subscription/dto/check-limit.dto';
+import { SubscriptionService } from '../subscription/subscription.service';
 import Utils from '../utils/errorUtils';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -20,12 +28,18 @@ export class UserService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Restaurant)
+    private readonly restaurantRepository: Repository<Restaurant>,
     @InjectRepository(Role)
     private readonly roleRepository: Repository<Role>,
     @InjectRepository(Profile)
     private readonly profileRepository: Repository<Profile>,
     @InjectRepository(ProfileRole)
     private readonly profileRoleRepository: Repository<ProfileRole>,
+    @InjectRepository(RestaurantStaff)
+    private readonly restaurantStaffRepository: Repository<RestaurantStaff>,
+    private readonly restaurantService: RestaurantService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   private sanitizeUser(user: User) {
@@ -160,6 +174,20 @@ export class UserService {
       const role = createUserDto.roleId
         ? await this.findRoleOrFail(createUserDto.roleId)
         : null;
+      const restaurant = createUserDto.restaurantId
+        ? await this.restaurantRepository.findOne({
+            where: { id: createUserDto.restaurantId, state: true },
+          })
+        : await this.restaurantService.getCurrentRestaurantEntity();
+
+      if (!restaurant) {
+        throw new NotFoundException('Restaurant not found');
+      }
+
+      await this.subscriptionService.checkLimit(
+        restaurant.id,
+        LimitKindEnum.STAFF,
+      );
 
       const user = new User();
       user.username = createUserDto.username;
@@ -183,6 +211,16 @@ export class UserService {
 
         await this.profileRoleRepository.save(profileRole);
       }
+
+      const staffMembership = this.restaurantStaffRepository.create({
+        restaurant,
+        user: newUser,
+        staffRole: role?.name?.toLowerCase().includes('cocina')
+          ? RestaurantStaffRoleEnum.KITCHEN
+          : RestaurantStaffRoleEnum.ADMIN,
+        state: user.state,
+      });
+      await this.restaurantStaffRepository.save(staffMembership);
 
       const createdUser = await this.userRepository.findOne({
         where: { id: newUser.id },
@@ -358,6 +396,14 @@ export class UserService {
       user.status = StatusEnum.INACTIVE;
 
       const removedUser = await this.userRepository.save(user);
+
+      await this.restaurantStaffRepository
+        .createQueryBuilder()
+        .update(RestaurantStaff)
+        .set({ state: false })
+        .where('"userId" = :userId', { userId: user.id })
+        .andWhere('state = true')
+        .execute();
 
       return {
         message: 'Usuario desactivado exitosamente',

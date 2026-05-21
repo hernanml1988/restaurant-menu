@@ -10,6 +10,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { Restaurant } from '../restaurant/entities/restaurant.entity';
+import { LimitKindEnum } from '../subscription/dto/check-limit.dto';
+import { SubscriptionService } from '../subscription/subscription.service';
 import { CreateTableDto } from './dto/create-table.dto';
 import { UpdateTableDto } from './dto/update-table.dto';
 import { Table } from './entities/table.entity';
@@ -26,6 +28,7 @@ export class TableService {
     @InjectRepository(Restaurant)
     private readonly restaurantRepository: Repository<Restaurant>,
     private readonly configService: ConfigService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   private generateQrCodePayload(
@@ -120,6 +123,10 @@ export class TableService {
       if (!restaurant) {
         throw new NotFoundException('Restaurant not found');
       }
+      await this.subscriptionService.checkLimit(
+        restaurant.id,
+        LimitKindEnum.TABLES,
+      );
 
       const qrCode =
         createTableDto.qrCode ??

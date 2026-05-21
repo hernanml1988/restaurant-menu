@@ -21,8 +21,12 @@ import { Reservation } from '../reservation/entities/reservation.entity';
 import { Restaurant } from '../restaurant/entities/restaurant.entity';
 import { Role } from '../role/entities/role.entity';
 import { ServiceRequest } from '../service_request/entities/service_request.entity';
+import { Plan } from '../subscription/entities/plan.entity';
+import { RestaurantSubscription } from '../subscription/entities/restaurant-subscription.entity';
+import { UsageCounter } from '../subscription/entities/usage-counter.entity';
 import { Table } from '../table/entities/table.entity';
 import { User } from '../user/entities/user.entity';
+import { RestaurantStaff } from '../restaurant_staff/entities/restaurant_staff.entity';
 
 const appConfig = configuration();
 
@@ -63,6 +67,10 @@ export default new DataSource({
     Reservation,
     FiscalDocument,
     RealtimeEvent,
+    RestaurantStaff,
+    Plan,
+    RestaurantSubscription,
+    UsageCounter,
   ],
   migrations: ['src/database/migrations/*.ts'],
 });

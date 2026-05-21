@@ -9,6 +9,8 @@ import { Category } from '../category/entities/category.entity';
 import { ProductExtra } from '../product_extra/entities/product_extra.entity';
 import { Restaurant } from '../restaurant/entities/restaurant.entity';
 import { RestaurantService } from '../restaurant/restaurant.service';
+import { LimitKindEnum } from '../subscription/dto/check-limit.dto';
+import { SubscriptionService } from '../subscription/subscription.service';
 import Utils from '../utils/errorUtils';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -26,6 +28,7 @@ export class ProductService {
     @InjectRepository(ProductExtra)
     private readonly productExtraRepository: Repository<ProductExtra>,
     private readonly restaurantService: RestaurantService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   private sanitizeOptionalText(value?: string | null) {
@@ -148,6 +151,16 @@ export class ProductService {
       }
 
       const nextName = createProductDto.name.trim();
+      await this.subscriptionService.checkLimit(
+        restaurant.id,
+        LimitKindEnum.PRODUCTS,
+      );
+      if (this.sanitizeOptionalText(createProductDto.image)) {
+        await this.subscriptionService.checkLimit(
+          restaurant.id,
+          LimitKindEnum.PRODUCTS_WITH_IMAGE,
+        );
+      }
 
       await this.ensureUniqueProductName(restaurant.id, nextName);
 

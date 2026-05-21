@@ -5,11 +5,13 @@ import {
   BeforeInsert,
   BeforeUpdate,
   OneToOne,
-  JoinColumn,
+  OneToMany,
 } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { StatusEnum } from '../../enums/status.enum';
 import { Profile } from '../../profile/entities/profile.entity';
+import { Restaurant } from '../../restaurant/entities/restaurant.entity';
+import { RestaurantStaff } from '../../restaurant_staff/entities/restaurant_staff.entity';
 
 @Entity()
 export class User {
@@ -59,6 +61,12 @@ export class User {
   @OneToOne(() => Profile, (profile) => profile.user) // Bidireccional
   
   profile: Profile;
+
+  @OneToMany(() => Restaurant, (restaurant) => restaurant.ownerUser)
+  ownedRestaurants: Restaurant[];
+
+  @OneToMany(() => RestaurantStaff, (restaurantStaff) => restaurantStaff.user)
+  restaurantMemberships: RestaurantStaff[];
 
 
   //fin relaciones 

@@ -4,6 +4,13 @@ export class OperationalHardening1760000000000 implements MigrationInterface {
   name = 'OperationalHardening1760000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    const hasRestaurants = await queryRunner.hasTable('restaurants');
+    if (!hasRestaurants) {
+      // In fresh databases the legacy base schema may not exist yet.
+      // Skip this additive migration instead of crashing application boot.
+      return;
+    }
+
     await queryRunner.query(`
       ALTER TABLE IF EXISTS products
       ADD COLUMN IF NOT EXISTS "trackStock" boolean NOT NULL DEFAULT false,
