@@ -26,6 +26,6 @@ import { SubscriptionModule } from '../subscription/subscription.module';
   ],
   controllers: [UserController],
   providers: [UserService],
-  exports:[TypeOrmModule]
+  exports:[TypeOrmModule, UserService]
 })
 export class UserModule {}
