@@ -4,8 +4,8 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Restaurant } from '../restaurant/entities/restaurant.entity';
 import { RestaurantStaff } from '../restaurant_staff/entities/restaurant_staff.entity';
 import { Product } from '../product/entities/product.entity';
@@ -20,6 +20,8 @@ import { LimitKindEnum } from './dto/check-limit.dto';
 @Injectable()
 export class SubscriptionService implements OnModuleInit {
   constructor(
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     @InjectRepository(Plan)
     private readonly planRepository: Repository<Plan>,
     @InjectRepository(RestaurantSubscription)
@@ -35,6 +37,13 @@ export class SubscriptionService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    const hasPlans = await this.dataSource.query(
+      `SELECT to_regclass('public.plans') as "tableName"`,
+    );
+    if (!hasPlans?.[0]?.tableName) {
+      return;
+    }
+
     await this.seedDefaultPlans();
   }
 

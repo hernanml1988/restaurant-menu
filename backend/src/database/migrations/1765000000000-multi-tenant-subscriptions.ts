@@ -4,6 +4,13 @@ export class MultiTenantSubscriptions1765000000000 implements MigrationInterface
   name = 'MultiTenantSubscriptions1765000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    const hasRestaurants = await queryRunner.hasTable('restaurants');
+    const hasUsers = await queryRunner.hasTable('user');
+    if (!hasRestaurants || !hasUsers) {
+      // This migration extends the legacy base schema; skip when base tables are absent.
+      return;
+    }
+
     await queryRunner.query(`ALTER TABLE IF EXISTS restaurants ADD COLUMN IF NOT EXISTS "ownerUserId" uuid NULL REFERENCES "user"(id);`);
 
     await queryRunner.query(`
