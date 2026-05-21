@@ -35,4 +35,8 @@ export class CreateUserDto {
   @IsOptional()
   @IsBoolean()
   state?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  restaurantId?: string;
 }

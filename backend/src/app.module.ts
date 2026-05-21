@@ -44,8 +44,13 @@ import { ServiceRequestModule } from './service_request/service_request.module';
 import { ServiceRequest } from './service_request/entities/service_request.entity';
 import { TableModule } from './table/table.module';
 import { Table } from './table/entities/table.entity';
+import { SubscriptionModule } from './subscription/subscription.module';
+import { Plan } from './subscription/entities/plan.entity';
+import { RestaurantSubscription } from './subscription/entities/restaurant-subscription.entity';
+import { UsageCounter } from './subscription/entities/usage-counter.entity';
 import { UserModule } from './user/user.module';
 import { User } from './user/entities/user.entity';
+import { RestaurantStaff } from './restaurant_staff/entities/restaurant_staff.entity';
 
 const appEntities = [
   User,
@@ -70,6 +75,10 @@ const appEntities = [
   Reservation,
   FiscalDocument,
   RealtimeEvent,
+  RestaurantStaff,
+  Plan,
+  RestaurantSubscription,
+  UsageCounter,
 ];
 
 @Module({
@@ -118,6 +127,7 @@ const appEntities = [
     AuditLogModule,
     ReservationModule,
     FiscalDocumentModule,
+    SubscriptionModule,
   ],
   controllers: [AppController],
   providers: [AppService],

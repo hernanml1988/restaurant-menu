@@ -3,6 +3,7 @@ import {
   BeforeUpdate,
   Column,
   Entity,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
@@ -14,6 +15,9 @@ import { Payment } from '../../payment/entities/payment.entity';
 import { Product } from '../../product/entities/product.entity';
 import { ServiceRequest } from '../../service_request/entities/service_request.entity';
 import { Table } from '../../table/entities/table.entity';
+import { User } from '../../user/entities/user.entity';
+import { RestaurantStaff } from '../../restaurant_staff/entities/restaurant_staff.entity';
+import { RestaurantSubscription } from '../../subscription/entities/restaurant-subscription.entity';
 
 @Entity('restaurants')
 export class Restaurant {
@@ -62,6 +66,11 @@ export class Restaurant {
   @Column()
   modifiedBy: string;
 
+  @ManyToOne(() => User, (user) => user.ownedRestaurants, {
+    nullable: true,
+  })
+  ownerUser: User;
+
   @OneToMany(() => Table, (table) => table.restaurant)
   tables: Table[];
 
@@ -82,6 +91,15 @@ export class Restaurant {
 
   @OneToMany(() => ServiceRequest, (serviceRequest) => serviceRequest.restaurant)
   serviceRequests: ServiceRequest[];
+
+  @OneToMany(() => RestaurantStaff, (restaurantStaff) => restaurantStaff.restaurant)
+  staffMemberships: RestaurantStaff[];
+
+  @OneToMany(
+    () => RestaurantSubscription,
+    (restaurantSubscription) => restaurantSubscription.restaurant,
+  )
+  subscriptions: RestaurantSubscription[];
 
   @BeforeInsert()
   createCreatedBy() {

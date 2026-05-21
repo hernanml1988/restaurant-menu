@@ -4,6 +4,7 @@ import { Category } from '../category/entities/category.entity';
 import { ProductExtra } from '../product_extra/entities/product_extra.entity';
 import { Restaurant } from '../restaurant/entities/restaurant.entity';
 import { RestaurantModule } from '../restaurant/restaurant.module';
+import { SubscriptionModule } from '../subscription/subscription.module';
 import { ProductController } from './product.controller';
 import { ProductService } from './product.service';
 import { Product } from './entities/product.entity';
@@ -12,6 +13,7 @@ import { Product } from './entities/product.entity';
   imports: [
     TypeOrmModule.forFeature([Product, Restaurant, Category, ProductExtra]),
     RestaurantModule,
+    SubscriptionModule,
   ],
   controllers: [ProductController],
   providers: [ProductService],
