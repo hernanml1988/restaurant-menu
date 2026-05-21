@@ -87,15 +87,7 @@ export class SubscriptionService implements OnModuleInit {
       },
     ];
 
-    for (const planData of defaults) {
-      const existing = await this.planRepository.findOne({
-        where: { code: planData.code },
-      });
-
-      if (!existing) {
-        await this.planRepository.save(this.planRepository.create(planData));
-      }
-    }
+    await this.planRepository.upsert(defaults, ['code']);
   }
 
   async getOrCreateActiveSubscription(restaurantId: string) {
@@ -163,9 +155,13 @@ export class SubscriptionService implements OnModuleInit {
 
   private async getCurrentUsage(restaurantId: string, kind: LimitKindEnum) {
     if (kind === LimitKindEnum.STAFF) {
-      return this.restaurantStaffRepository.count({
-        where: { restaurant: { id: restaurantId }, state: true },
-      });
+      return this.restaurantStaffRepository
+        .createQueryBuilder('staff')
+        .innerJoin('staff.user', 'user')
+        .where('staff.state = true')
+        .andWhere('staff."restaurantId" = :restaurantId', { restaurantId })
+        .andWhere('user.state = true')
+        .getCount();
     }
 
     if (kind === LimitKindEnum.PRODUCTS) {

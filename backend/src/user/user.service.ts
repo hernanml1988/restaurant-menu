@@ -218,7 +218,7 @@ export class UserService {
         staffRole: role?.name?.toLowerCase().includes('cocina')
           ? RestaurantStaffRoleEnum.KITCHEN
           : RestaurantStaffRoleEnum.ADMIN,
-        state: true,
+        state: user.state,
       });
       await this.restaurantStaffRepository.save(staffMembership);
 
@@ -396,6 +396,14 @@ export class UserService {
       user.status = StatusEnum.INACTIVE;
 
       const removedUser = await this.userRepository.save(user);
+
+      await this.restaurantStaffRepository
+        .createQueryBuilder()
+        .update(RestaurantStaff)
+        .set({ state: false })
+        .where('"userId" = :userId', { userId: user.id })
+        .andWhere('state = true')
+        .execute();
 
       return {
         message: 'Usuario desactivado exitosamente',
